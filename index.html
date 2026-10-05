@@ -1859,6 +1859,7 @@ function renderComptes(){
       <td style="white-space:nowrap;display:flex;gap:3px;flex-wrap:wrap">
         ${u.role==='responsable'?`<button class="btn btn-o btn-xs" onclick="ouvrirEditAcces('${u.id}')">🔐</button>`:''}
         <button class="btn btn-o btn-xs" onclick="ouvrirEditCompte('${u.id}')">✏️</button>
+        <button class="btn btn-xs" style="background:var(--vert);color:#fff" title="Carte d'accès" onclick="genererCarte('${u.id}')">🪪</button>
         ${u.role!=='president'?`<button class="btn btn-o btn-xs" onclick="toggleUser(${i})">${u.actif?'⏸':'▶'}</button><button class="btn btn-xs btn-r" onclick="supprimerCompte('${u.id}')">🗑</button>`:''}
       </td>
     </tr>`).join('');
@@ -1874,7 +1875,117 @@ async function creerCompte(){
   await sbInsert('users', data);
   DB.users.push(data);
   closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);renderComptes();
-  alert(`Compte créé pour ${p} ${n}.\nEmail : ${e}\nMDP : ${pw}`);
+  // Génère et affiche la carte d'accès automatiquement
+  setTimeout(()=>genererCarte(data.id),200);
+}
+
+function genererCarte(userId){
+  const u=DB.users.find(x=>x.id===userId);
+  if(!u){alert('Utilisateur introuvable.');return;}
+  // Dimensions carte
+  const W=700,H=400;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+
+  // Fond dégradé vert
+  const grad=ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'#1a6b3a');grad.addColorStop(1,'#2d8a50');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+
+  // Bande décorative gauche
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.fillRect(0,0,8,H);
+
+  // Rectangle blanc central
+  const mx=50,my=70,mw=W-100,mh=H-140;
+  ctx.fillStyle='#fff';
+  ctx.shadowColor='rgba(0,0,0,0.25)';ctx.shadowBlur=18;
+  ctx.beginPath();
+  ctx.roundRect(mx,my,mw,mh,14);
+  ctx.fill();
+  ctx.shadowBlur=0;
+
+  // Barre verte en haut du rectangle
+  ctx.fillStyle='#1a6b3a';
+  ctx.beginPath();ctx.roundRect(mx,my,mw,44,{upperLeft:14,upperRight:14,lowerLeft:0,lowerRight:0});ctx.fill();
+
+  // Titre sur barre verte
+  ctx.fillStyle='#fff';ctx.font='bold 16px Segoe UI, sans-serif';ctx.textAlign='left';
+  ctx.fillText('CARTE D\'ACCÈS — FNG Fria Nouvelle Génération',mx+18,my+28);
+
+  // Cercle avatar
+  const cx=mx+70,cy=my+44+75;
+  ctx.fillStyle='#e8f5ee';
+  ctx.beginPath();ctx.arc(cx,cy,52,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#1a6b3a';ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(cx,cy,52,0,Math.PI*2);ctx.stroke();
+  // Initiales
+  const initials=((u.prenom||'')[0]||'').toUpperCase()+((u.nom||'')[0]||'').toUpperCase();
+  ctx.fillStyle='#1a6b3a';ctx.font='bold 32px Segoe UI, sans-serif';ctx.textAlign='center';
+  ctx.fillText(initials,cx,cy+12);
+
+  // Nom
+  const tx=mx+150,ty=my+44+38;
+  ctx.fillStyle='#1a2420';ctx.font='bold 22px Segoe UI, sans-serif';ctx.textAlign='left';
+  ctx.fillText((u.prenom||'')+' '+(u.nom||''),tx,ty);
+
+  // Rôle badge
+  const roleMap={president:'Président',vp:'Vice-Président',secretaire:'Secrétaire',tresorier:'Trésorier',responsable:'Responsable',membre:'Membre'};
+  const rl=roleMap[u.role]||u.role||'';
+  ctx.fillStyle='#1a6b3a';
+  const bw=ctx.measureText(rl).width+24;
+  ctx.beginPath();ctx.roundRect(tx,ty+8,bw,24,6);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 12px Segoe UI, sans-serif';
+  ctx.fillText(rl,tx+12,ty+25);
+
+  // Ligne séparatrice
+  ctx.strokeStyle='#e2e8e4';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(mx+140,my+44+105);ctx.lineTo(mx+mw-20,my+44+105);ctx.stroke();
+
+  // Infos
+  const infoY=my+44+130;
+  const fields=[
+    ['📧  Email',u.email||'—'],
+    ['🔑  Mot de passe',u.pwd||'—'],
+    ['🛡  Accès',u.role==='responsable'?(u.volet||'—'):'Tous les volets'],
+    ['✅  Statut',u.actif?'Compte actif':'Compte inactif']
+  ];
+  ctx.textAlign='left';
+  fields.forEach(([lbl,val],idx)=>{
+    const y=infoY+idx*30;
+    ctx.fillStyle='#4a5a4f';ctx.font='12px Segoe UI, sans-serif';
+    ctx.fillText(lbl,tx,y);
+    ctx.fillStyle='#1a2420';ctx.font='bold 13px Segoe UI, sans-serif';
+    ctx.fillText(val,tx+160,y);
+  });
+
+  // Footer
+  ctx.fillStyle='rgba(255,255,255,0.55)';ctx.font='11px Segoe UI, sans-serif';ctx.textAlign='center';
+  const now=new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'});
+  ctx.fillText('FNG — Fria Nouvelle Génération  •  Généré le '+now,W/2,H-18);
+
+  // Afficher dans modal
+  const dataUrl=cv.toDataURL('image/jpeg',0.95);
+  const nom=(u.prenom||'')+'_'+(u.nom||'');
+  let modal=document.getElementById('m-carte-acces');
+  if(!modal){
+    modal=document.createElement('div');modal.id='m-carte-acces';
+    modal.className='modal';modal.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px;max-width:760px;width:100%;text-align:center">
+      <h3 style="margin-bottom:14px;color:var(--vert);font-size:18px">🪪 Carte d'accès</h3>
+      <img id="carte-img" style="max-width:100%;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15)" />
+      <br><br>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <a id="carte-dl" download="" class="btn btn-p" style="text-decoration:none">⬇ Télécharger JPEG</a>
+        <button class="btn btn-o" onclick="document.getElementById('m-carte-acces').style.display='none'">Fermer</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('carte-img').src=dataUrl;
+  document.getElementById('carte-dl').href=dataUrl;
+  document.getElementById('carte-dl').download='carte_acces_'+nom+'.jpg';
+  modal.style.display='flex';
 }
 
 function toggleUser(i){
