@@ -1321,7 +1321,15 @@ async function sbUpdate(table, id, data) {
               'Content-Type': 'application/json', 'Prefer': 'return=representation'},
     body: JSON.stringify(data)
   });
-  return res.json();
+  if(!res.ok){
+    const err=await res.text();
+    console.error(`[sbUpdate] ERREUR ${res.status} sur ${table}/${id}:`, err);
+    alert(`⚠️ Erreur de sauvegarde (${res.status}): ${err}`);
+    return null;
+  }
+  const json=await res.json();
+  if(!json||json.length===0) console.warn(`[sbUpdate] Aucune ligne modifiée sur ${table} id=${id} — vérifier que l'id existe`);
+  return json;
 }
 
 async function sbDelete(table, id) {
