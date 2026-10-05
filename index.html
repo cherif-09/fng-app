@@ -1379,13 +1379,15 @@ let DB = {
 };
 
 async function loadAllData() {
-  const [membres, transactions, activites, beneficiaires, users, messages] = await Promise.all([
+  const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
     sbGet('membres'),
     sbGet('transactions','order=created_at.desc'),
     sbGet('activites'),
     sbGet('beneficiaires'),
     sbGet('users'),
-    sbGet('messages','order=date.asc').catch(()=>[])
+    sbGet('messages','order=date.asc').catch(()=>[]),
+    sbGet('notifications','order=date.desc').catch(()=>[]),
+    sbGet('extra_acces').catch(()=>[])
   ]);
   DB.membres = membres || [];
   DB.transactions = (transactions || []).map(t=>({...t, montant: parseFloat(t.montant)||0}));
@@ -1393,6 +1395,11 @@ async function loadAllData() {
   DB.beneficiaires = beneficiaires || [];
   DB.users = users || [];
   DB.messages = (messages||[]).map(supaToMsg);
+  DB.notifications = notifs || [];
+  DB.extraAcces = (extraAcc||[]).map(r=>({
+    userId: r.user_id, section: r.section, niveau: r.niveau,
+    expiration: r.expiration ? new Date(r.expiration).getTime() : null, id: r.id
+  }));
   // Rafraîchir currentUser avec les données à jour (acces_volets inclus)
   if(currentUser) {
     const fresh = DB.users.find(u=>u.id===currentUser.id);
@@ -1413,6 +1420,37 @@ const PAGE_LABELS = {
   partenaires:'Partenaires & Dons',forum:'Espace de discussion',rapports:'Rapports & Impact',documents:'Documents',
   notifications:'Notifications',comptes:'Gestion des comptes'
 };
+
+// Hiérarchie des rôles pour le routage des notifications
+// Niveaux: 1=tous, 2=président+VP, 3=président+VP+financier, 4=président+VP+financier+SG
+const NOTIF_ROLES = {
+  tous: ['president','vp','responsable','membre'],
+  presidence: ['president','vp'],
+  financier: ['president','vp','financier','tresorier'],
+  gouvernance: ['president','vp','financier','tresorier','secretaire','sg']
+};
+// Types de notifications et leurs destinataires
+const NOTIF_TYPES = {
+  demande_acces: 'presidence',      // demande accès → président+VP seulement
+  approbation_transaction: 'presidence',
+  annonce: 'tous',
+  rapport_financier: 'financier',
+  gouvernance: 'gouvernance'
+};
+
+function getRolesForNotifType(type) {
+  const key = NOTIF_TYPES[type] || 'tous';
+  return NOTIF_ROLES[key] || NOTIF_ROLES.tous;
+}
+
+function userShouldReceiveNotif(notif, user) {
+  if(!user) return false;
+  // Si destinataire spécifique par userId
+  if(notif.destinataire_id) return notif.destinataire_id === user.id;
+  // Par rôle cible
+  const roles = getRolesForNotifType(notif.type_notif||'annonce');
+  return roles.includes(user.role);
+}
 
 function canAccess(section) {
   if(!currentUser) return false;
@@ -1470,6 +1508,8 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   localStorage.removeItem('fng_user_id');
+  stopPolling();
+  if(notifPollingInterval){clearInterval(notifPollingInterval);notifPollingInterval=null;}
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('li-email').value='';
@@ -1485,6 +1525,7 @@ function initApp() {
   buildSidebar();
   showPage('dashboard');
   updateNotifBadge();
+  startNotifPolling();
 }
 
 function roleLabel(r) {
@@ -1826,17 +1867,32 @@ function exportRapport(){renderRapports();const t=document.getElementById('r-exp
 // ══════════════════════════════════════
 // NOTIFICATIONS & ACCÈS
 // ══════════════════════════════════════
-function demanderAcces(section){
+async function demanderAcces(section){
   const sLabel = PAGE_LABELS[section]||section;
-  const existant = DB.notifications.find(n=>n.userId===currentUser.id&&n.section===section&&n.statut==='en attente');
+  const existant = DB.notifications.find(n=>n.user_id===currentUser.id&&n.section===section&&n.statut==='en attente');
   if(existant){alert('Vous avez déjà une demande en attente pour cette section.');return;}
-  DB.notifications.push({id:'n'+Date.now(),userId:currentUser.id,userName:currentUser.prenom+' '+currentUser.nom,section,sLabel,statut:'en attente',date:new Date().toLocaleDateString('fr-FR')});
+  const newNotif = {
+    id: 'n'+Date.now(),
+    type_notif: 'demande_acces',
+    user_id: currentUser.id,
+    user_nom: (currentUser.prenom+' '+currentUser.nom).trim(),
+    section,
+    s_label: sLabel,
+    statut: 'en attente',
+    date: new Date().toISOString()
+  };
+  const res = await sbInsert('notifications', newNotif);
+  if(res) {
+    DB.notifications.unshift(res[0]||newNotif);
+  } else {
+    DB.notifications.unshift(newNotif);
+  }
   updateNotifBadge();
-  alert(`Demande envoyée au Président pour accéder à "${sLabel}". Vous serez notifié(e) dès validation.`);
+  alert(`✅ Demande envoyée au Président pour accéder à "${sLabel}". Vous serez notifié(e) dès validation.`);
 }
 
 function updateNotifBadge(){
-  const pending=DB.notifications.filter(n=>n.statut==='en attente').length;
+  const pending=DB.notifications.filter(n=>n.statut==='en attente'&&userShouldReceiveNotif(n,currentUser)).length;
   const badge=document.getElementById('notif-badge');
   const dot=document.getElementById('notif-dot-nav');
   if(badge){badge.textContent=pending;badge.style.display=pending>0?'block':'none';}
@@ -1844,42 +1900,68 @@ function updateNotifBadge(){
 }
 
 function renderNotifications(){
-  if(!isAdmin()){document.getElementById('notif-info').style.display='block';document.getElementById('notif-info').textContent='Accès réservé au Président et à la Vice-Présidente.';return;}
-  document.getElementById('notif-info').style.display='none';
-  const pending=DB.notifications.filter(n=>n.statut==='en attente');
-  document.getElementById('notif-cnt').textContent=`(${pending.length} en attente)`;
-  const list=document.getElementById('notif-list');
-  if(!pending.length){list.innerHTML='<div class="empty"><div class="ei">✅</div><p>Aucune demande en attente</p></div>';return;}
-  list.innerHTML=pending.map(n=>`
-    <div class="notif-item">
-      <div class="ni-icon">🔔</div>
-      <div class="ni-text">
-        <div class="nt">${n.userName}</div>
-        <div class="ns2">Demande d'accès à <strong>${n.sLabel}</strong> · ${n.date}</div>
-      </div>
-      <div class="ni-actions">
-        <button class="btn btn-o btn-xs" onclick="approuverAcces('${n.id}','lecture')">👁 Lecture</button>
-        <button class="btn btn-p btn-xs" onclick="approuverAcces('${n.id}','ecriture')">✏️ Écriture</button>
-        <button class="btn btn-xs" style="background:var(--gris-leg);color:var(--gris-txt)" onclick="refuserAcces('${n.id}')">✕</button>
-      </div>
-    </div>`).join('');
-  // Table accès
-  renderTableAcces();
+  const notifInfo = document.getElementById('notif-info');
+  const list = document.getElementById('notif-list');
+  const cnt = document.getElementById('notif-cnt');
+
+  // Notifications destinées à moi
+  const mesNotifs = DB.notifications.filter(n=>userShouldReceiveNotif(n,currentUser));
+  const pending = mesNotifs.filter(n=>n.statut==='en attente');
+  const hist = mesNotifs.filter(n=>n.statut!=='en attente');
+
+  if(notifInfo) notifInfo.style.display='none';
+  if(cnt) cnt.textContent=`(${pending.length} en attente)`;
+
+  if(!list) return;
+  let html = '';
+
+  if(!mesNotifs.length){
+    html='<div class="empty"><div class="ei">🔔</div><p>Aucune notification</p></div>';
+  } else {
+    if(pending.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--gris-txt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">En attente (${pending.length})</div>`;
+      html += pending.map(n=>{
+        const isDemandeAcces = n.type_notif==='demande_acces';
+        const dateStr = n.date ? new Date(n.date).toLocaleDateString('fr-FR') : '';
+        return `<div class="notif-item" style="border-left:3px solid var(--or);margin-bottom:8px">
+          <div class="ni-icon">🔔</div>
+          <div class="ni-text">
+            <div class="nt">${n.user_nom||n.userName||'Membre'}</div>
+            <div class="ns2">${isDemandeAcces?`Demande d'accès à <strong>${n.s_label||n.sLabel}</strong>`:n.message||n.type_notif} · ${dateStr}</div>
+          </div>
+          ${isDemandeAcces&&isAdmin()?`<div class="ni-actions">
+            <button class="btn btn-p btn-xs" onclick="ouvrirApprouver('${n.id}')">✅ Approuver</button>
+            <button class="btn btn-xs" style="background:var(--gris-leg);color:var(--gris-txt)" onclick="refuserAcces('${n.id}')">✕ Refuser</button>
+          </div>`:''}
+        </div>`;
+      }).join('');
+    }
+    if(hist.length){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--gris-txt);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px">Historique</div>`;
+      html += hist.slice(0,10).map(n=>{
+        const dateStr = n.date ? new Date(n.date).toLocaleDateString('fr-FR') : '';
+        const icon = n.statut==='approuvé'?'✅':n.statut==='refusé'?'❌':'ℹ️';
+        return `<div class="notif-item" style="opacity:.7">
+          <div class="ni-icon">${icon}</div>
+          <div class="ni-text">
+            <div class="nt">${n.user_nom||n.userName||'Membre'}</div>
+            <div class="ns2">${n.s_label||n.sLabel||n.message||''} · ${dateStr} · <strong>${n.statut}</strong></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+  list.innerHTML = html;
+
+  if(isAdmin()) renderTableAcces();
 }
 
-function approuverAcces(nid, niveau){
+async function refuserAcces(nid){
+  if(!confirm('Refuser cette demande d\'accès ?')) return;
   const notif=DB.notifications.find(n=>n.id===nid);
   if(!notif)return;
-  notif.statut='approuvé';
-  // Supprimer ancien accès si existe
-  DB.extraAcces=DB.extraAcces.filter(e=>!(e.userId===notif.userId&&e.section===notif.section));
-  DB.extraAcces.push({userId:notif.userId,section:notif.section,niveau});
-  updateNotifBadge();renderNotifications();
-}
-
-function refuserAcces(nid){
-  const notif=DB.notifications.find(n=>n.id===nid);
-  if(notif)notif.statut='refusé';
+  notif.statut='refusé';
+  await sbUpdate('notifications', nid, {statut:'refusé'}).catch(()=>{});
   updateNotifBadge();renderNotifications();
 }
 
@@ -2895,13 +2977,18 @@ function genNumBenef(){
 
 function renderMesDemandesAcces(){
   const list=document.getElementById('mes-demandes-list');
-  const mes=DB.notifications.filter(n=>n.userId===currentUser.id);
+  if(!list) return;
+  const mes=DB.notifications.filter(n=>(n.user_id||n.userId)===currentUser.id&&n.type_notif==='demande_acces');
   if(!mes.length){list.innerHTML='<div class="empty"><div class="ei">📬</div><p>Aucune demande envoyée</p></div>';return;}
-  list.innerHTML=mes.map(n=>`<div class="notif-item">
-    <div class="ni-icon">${n.statut==='approuvé'?'✅':n.statut==='refusé'?'❌':'⏳'}</div>
-    <div class="ni-text"><div class="nt">${n.sLabel}</div>
-    <div class="ns2">Demande du ${n.date} · <strong>${n.statut}</strong></div></div>
-  </div>`).join('');
+  list.innerHTML=mes.map(n=>{
+    const dateStr=n.date?new Date(n.date).toLocaleDateString('fr-FR'):'';
+    const label=n.s_label||n.sLabel||n.section||'?';
+    return `<div class="notif-item">
+      <div class="ni-icon">${n.statut==='approuvé'?'✅':n.statut==='refusé'?'❌':'⏳'}</div>
+      <div class="ni-text"><div class="nt">${label}</div>
+      <div class="ns2">Demande du ${dateStr} · <strong>${n.statut}</strong></div></div>
+    </div>`;
+  }).join('');
 }
 
 function renderUserActivitesApprouvees(){
@@ -2922,8 +3009,10 @@ function renderUserActivitesApprouvees(){
 function ouvrirApprouver(nid){
   notifCourante=DB.notifications.find(n=>n.id===nid);
   if(!notifCourante) return;
+  const nom = notifCourante.user_nom||notifCourante.userName||'Membre';
+  const label = notifCourante.s_label||notifCourante.sLabel||notifCourante.section||'?';
   document.getElementById('approuver-info').innerHTML=
-    `<strong>${notifCourante.userName}</strong> demande l'accès à <strong>${notifCourante.sLabel}</strong>.<br>Choisissez le niveau et la durée d'accès.`;
+    `<strong>${nom}</strong> demande l'accès à <strong>${label}</strong>.<br>Choisissez le niveau et la durée d'accès.`;
   document.getElementById('ap-duree-type').value='indefini';
   document.getElementById('ap-niveau').value='lecture';
   toggleDureeInput();
@@ -2938,31 +3027,73 @@ function toggleDureeInput(){
   document.getElementById('ap-duree-label').textContent=labels[t]||'Valeur';
 }
 
-function validerApprouverAcces(){
+async function validerApprouverAcces(){
   if(!notifCourante) return;
   const niveau=document.getElementById('ap-niveau').value;
   const dtype=document.getElementById('ap-duree-type').value;
   const dval=document.getElementById('ap-duree-val').value;
   if(dtype!=='indefini'&&(!dval||+dval<1)){alert('Entrez une durée valide.');return;}
   const exp=calcExpiration(dtype,dval);
+  const uid = notifCourante.user_id||notifCourante.userId;
+  const section = notifCourante.section;
+
+  // 1. Mettre à jour le statut de la notification
   notifCourante.statut='approuvé';
-  DB.extraAcces=DB.extraAcces.filter(e=>!(e.userId===notifCourante.userId&&e.section===notifCourante.section));
-  DB.extraAcces.push({userId:notifCourante.userId,section:notifCourante.section,niveau,expiration:exp});
+  await sbUpdate('notifications', notifCourante.id, {statut:'approuvé'}).catch(()=>{});
+
+  // 2. Sauvegarder dans extra_acces (si durée limitée)
+  DB.extraAcces=DB.extraAcces.filter(e=>!(e.userId===uid&&e.section===section));
+  const extraRow = {user_id: uid, section, niveau, expiration: exp ? new Date(exp).toISOString() : null};
+  // Supprimer l'ancien d'abord
+  const oldExtra = await sbGet('extra_acces', `user_id=eq.${uid}&section=eq.${section}`).catch(()=>[]);
+  if(oldExtra&&oldExtra.length) {
+    await fetch(`${SUPA_URL}/rest/v1/extra_acces?user_id=eq.${uid}&section=eq.${section}`,{
+      method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    }).catch(()=>{});
+  }
+  if(exp!==null) {
+    // Durée limitée : stocker dans extra_acces
+    await sbInsert('extra_acces', {...extraRow, id:'ea'+Date.now()}).catch(()=>{});
+    DB.extraAcces.push({userId:uid,section,niveau,expiration:exp});
+  }
+
+  // 3. Mettre à jour acces_volets dans la table users (si indéfini)
+  const targetUser = DB.users.find(u=>u.id===uid);
+  if(targetUser) {
+    const newVolets = {...(targetUser.acces_volets||{})};
+    newVolets[section] = niveau;
+    targetUser.acces_volets = newVolets;
+    await sbUpdate('users', uid, {acces_volets: newVolets}).catch(()=>{});
+  }
+
   closeM('m-approuver');notifCourante=null;
   updateNotifBadge();renderNotifications();
-  alert('✅ Accès accordé.');
+  alert('✅ Accès accordé avec succès.');
 }
 
-function refuserAccesCourant(){
+async function refuserAccesCourant(){
   if(!notifCourante) return;
   notifCourante.statut='refusé';
+  await sbUpdate('notifications', notifCourante.id, {statut:'refusé'}).catch(()=>{});
   closeM('m-approuver');notifCourante=null;
   updateNotifBadge();renderNotifications();
 }
 
-function revoquerAcces(userId,section){
+async function revoquerAcces(userId,section){
   if(!confirm('Révoquer cet accès immédiatement ?')) return;
   DB.extraAcces=DB.extraAcces.filter(e=>!(e.userId===userId&&e.section===section));
+  // Supprimer de Supabase
+  await fetch(`${SUPA_URL}/rest/v1/extra_acces?user_id=eq.${userId}&section=eq.${section}`,{
+    method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  }).catch(()=>{});
+  // Mettre à jour acces_volets sur l'utilisateur
+  const u=DB.users.find(x=>x.id===userId);
+  if(u&&u.acces_volets){
+    const newVolets={...u.acces_volets};
+    newVolets[section]='aucun';
+    u.acces_volets=newVolets;
+    await sbUpdate('users',userId,{acces_volets:newVolets}).catch(()=>{});
+  }
   renderTableAcces();
 }
 
@@ -3568,6 +3699,27 @@ function startPolling(){
   },3000);
 }
 function stopPolling(){ if(pollingInterval){clearInterval(pollingInterval);pollingInterval=null;} }
+
+// Polling global pour les notifications (toutes les 10 secondes)
+let notifPollingInterval=null;
+function startNotifPolling(){
+  if(notifPollingInterval) clearInterval(notifPollingInterval);
+  notifPollingInterval=setInterval(async()=>{
+    try{
+      const rows=await sbGet('notifications','order=date.desc');
+      if(!rows||!Array.isArray(rows)) return;
+      const avant=DB.notifications.filter(n=>n.statut==='en attente'&&userShouldReceiveNotif(n,currentUser)).length;
+      DB.notifications=rows;
+      const apres=DB.notifications.filter(n=>n.statut==='en attente'&&userShouldReceiveNotif(n,currentUser)).length;
+      if(apres!==avant){
+        updateNotifBadge();
+        // Si on est sur la page notifications, on re-render
+        const page=document.querySelector('.page.active');
+        if(page&&page.id==='page-notifications') renderNotifications();
+      }
+    }catch(e){}
+  },10000);
+}
 
 async function envoyerMessage(){
   const input=document.getElementById('msg-input');
