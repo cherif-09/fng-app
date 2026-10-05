@@ -1378,25 +1378,32 @@ let DB = {
   reunions: []
 };
 
+async function safeGet(table, filters='') {
+  try {
+    const r = await sbGet(table, filters);
+    return Array.isArray(r) ? r : [];
+  } catch(e) { return []; }
+}
+
 async function loadAllData() {
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
-    sbGet('membres'),
-    sbGet('transactions','order=created_at.desc'),
-    sbGet('activites'),
-    sbGet('beneficiaires'),
-    sbGet('users'),
-    sbGet('messages','order=date.asc').catch(()=>[]),
-    sbGet('notifications','order=date.desc').catch(()=>[]),
-    sbGet('extra_acces').catch(()=>[])
+    safeGet('membres'),
+    safeGet('transactions','order=created_at.desc'),
+    safeGet('activites'),
+    safeGet('beneficiaires'),
+    safeGet('users'),
+    safeGet('messages','order=date.asc'),
+    safeGet('notifications','order=date.desc'),
+    safeGet('extra_acces')
   ]);
-  DB.membres = membres || [];
-  DB.transactions = (transactions || []).map(t=>({...t, montant: parseFloat(t.montant)||0}));
-  DB.activites = activites || [];
-  DB.beneficiaires = beneficiaires || [];
-  DB.users = users || [];
-  DB.messages = (messages||[]).map(supaToMsg);
-  DB.notifications = notifs || [];
-  DB.extraAcces = (extraAcc||[]).map(r=>({
+  DB.membres = membres;
+  DB.transactions = transactions.map(t=>({...t, montant: parseFloat(t.montant)||0}));
+  DB.activites = activites;
+  DB.beneficiaires = beneficiaires;
+  DB.users = users;
+  DB.messages = messages.map(supaToMsg);
+  DB.notifications = notifs;
+  DB.extraAcces = extraAcc.map(r=>({
     userId: r.user_id, section: r.section, niveau: r.niveau,
     expiration: r.expiration ? new Date(r.expiration).getTime() : null, id: r.id
   }));
