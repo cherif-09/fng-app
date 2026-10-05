@@ -1880,7 +1880,8 @@ async function creerCompte(){
   if(pw.length<6){alert('Mot de passe minimum 6 caractères.');return;}
   if(DB.users.find(u=>u.email.toLowerCase()===e.toLowerCase())){alert('Cet email existe déjà.');return;}
   const r=v('mc-r');
-  const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true};
+  const accesVolets=r==='responsable'?getVoletAccesFromModal():null;
+  const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true,accesVolets};
   await sbInsert('users', data);
   DB.users.push(data);
   closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);renderComptes();
@@ -1996,15 +1997,19 @@ function genererCarte(userId){
   modal.style.display='flex';
 }
 
-function toggleUser(i){
+async function toggleUser(i){
   if(DB.users[i].role==='president'){alert('Impossible de désactiver le compte Président.');return;}
-  DB.users[i].actif=!DB.users[i].actif;renderComptes();
+  DB.users[i].actif=!DB.users[i].actif;
+  await sbUpdate('users', DB.users[i].id, {actif: DB.users[i].actif});
+  renderComptes();
 }
 
-function resetPwd(i){
+async function resetPwd(i){
   const newpwd=prompt(`Nouveau mot de passe pour ${DB.users[i].prenom} ${DB.users[i].nom} :`);
   if(!newpwd||newpwd.length<6){alert('Mot de passe invalide (min 6 caractères).');return;}
-  DB.users[i].pwd=newpwd;alert('Mot de passe mis à jour.');
+  DB.users[i].pwd=newpwd;
+  await sbUpdate('users', DB.users[i].id, {pwd: newpwd});
+  alert('✅ Mot de passe mis à jour et sauvegardé.');
 }
 
 // ══════════════════════════════════════
@@ -2281,7 +2286,7 @@ function ouvrirEditCompte(uid){
   openM('m-compte');
 }
 
-function sauvegarderEditCompte(uid){
+async function sauvegarderEditCompte(uid){
   const u=DB.users.find(x=>x.id===uid);if(!u)return;
   const p=v('mc-p'),e=v('mc-e'),pw=v('mc-pw');
   if(!p||!e){alert('Prénom et email obligatoires.');return;}
@@ -2292,21 +2297,25 @@ function sauvegarderEditCompte(uid){
   const r=v('mc-r');
   u.role=r==='vp'?'vp':'responsable';
   if(r==='responsable')u.accesVolets=getVoletAccesFromModal();
+  const updateData={prenom:u.prenom,nom:u.nom,email:u.email,role:u.role,accesVolets:u.accesVolets};
+  if(pw)updateData.pwd=pw;
+  await sbUpdate('users', uid, updateData);
   closeM('m-compte');
   const titre=document.querySelector('#m-compte .mt');
   if(titre)titre.textContent='Créer un compte utilisateur';
   const btn=document.querySelector('#m-compte .btn-p');
   if(btn){btn.textContent='Créer le compte';btn.onclick=creerCompte;}
-  renderComptes();alert('✅ Compte mis à jour.');
+  renderComptes();alert('✅ Compte mis à jour et sauvegardé.');
 }
 
-function supprimerCompte(uid){
+async function supprimerCompte(uid){
   const u=DB.users.find(x=>x.id===uid);if(!u)return;
   if(u.role==='president'){alert('Impossible de supprimer le compte Président.');return;}
   if(!confirm('Supprimer définitivement le compte de '+u.prenom+' '+u.nom+' ?\nCette action est irréversible.'))return;
+  await sbDelete('users', uid);
   DB.users=DB.users.filter(x=>x.id!==uid);
-  DB.extraAcces=DB.extraAcces.filter(e=>e.userId!==uid);
-  renderComptes();alert('Compte supprimé.');
+  DB.extraAcces=(DB.extraAcces||[]).filter(e=>e.userId!==uid);
+  renderComptes();alert('✅ Compte supprimé.');
 }
 
 
@@ -2961,14 +2970,15 @@ function ouvrirEditAcces(uid){
   openM('m-edit-acces');
 }
 
-function sauvegarderAcces(){
+async function sauvegarderAcces(){
   const u=DB.users.find(x=>x.id===editAccesUserId);
   if(!u) return;
   if(!u.accesVolets) u.accesVolets={};
   SECTIONS.forEach(s=>{const sel=document.querySelector(`input[name="edit-acces-${s}"]:checked`);u.accesVolets[s]=sel?sel.value:'aucun';});
+  await sbUpdate('users', u.id, {accesVolets: u.accesVolets});
   closeM('m-edit-acces');editAccesUserId=null;
   renderComptes();renderTableAcces();
-  alert('✅ Accès mis à jour.');
+  alert('✅ Accès mis à jour et sauvegardé.');
 }
 
 function renderProjetsCA(){
