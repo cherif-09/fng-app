@@ -615,9 +615,10 @@ tr:hover td{background:var(--vert-pale)}
                   onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();envoyerMessage();}"></textarea>
               </div>
               <div style="display:flex;flex-direction:column;gap:6px">
-                <label title="Envoyer une image" style="cursor:pointer;background:var(--vp);border:1.5px solid var(--vert);border-radius:8px;padding:8px 10px;font-size:16px;display:flex;align-items:center">
+                <label title="Envoyer une image" style="cursor:pointer;background:var(--vp);border:1.5px solid var(--vert);border-radius:8px;padding:8px 10px;font-size:16px;display:flex;align-items:center;justify-content:center">
                   🖼️<input type="file" accept="image/*" style="display:none" onchange="envoyerImage(this,'general')">
                 </label>
+                <button id="btn-vocal" onclick="toggleVocal()" title="Message vocal" style="background:var(--vp);border:1.5px solid var(--vert);border-radius:8px;padding:8px 10px;font-size:16px;cursor:pointer">🎤</button>
                 <button class="btn btn-p" onclick="envoyerMessage()" style="padding:8px 14px">➤</button>
               </div>
             </div>
@@ -1378,18 +1379,20 @@ let DB = {
 };
 
 async function loadAllData() {
-  const [membres, transactions, activites, beneficiaires, users] = await Promise.all([
+  const [membres, transactions, activites, beneficiaires, users, messages] = await Promise.all([
     sbGet('membres'),
     sbGet('transactions','order=created_at.desc'),
     sbGet('activites'),
     sbGet('beneficiaires'),
-    sbGet('users')
+    sbGet('users'),
+    sbGet('messages','order=date.asc').catch(()=>[])
   ]);
   DB.membres = membres || [];
   DB.transactions = (transactions || []).map(t=>({...t, montant: parseFloat(t.montant)||0}));
   DB.activites = activites || [];
   DB.beneficiaires = beneficiaires || [];
   DB.users = users || [];
+  DB.messages = messages || [];
   // Rafraîchir currentUser avec les données à jour (acces_volets inclus)
   if(currentUser) {
     const fresh = DB.users.find(u=>u.id===currentUser.id);
@@ -3458,11 +3461,24 @@ function renderBulle(msg, contexte){
   const bgAvatar = isMine ? 'var(--vert)' : '#'+Math.abs(hashCode(msg.auteurId||'x')).toString(16).slice(0,6).padEnd(6,'a');
   const avatar = `<div style="width:34px;height:34px;border-radius:50%;background:${bgAvatar};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;flex-shrink:0;text-transform:uppercase">${ini}</div>`;
   const reponseHtml = msg.repondreA ? `<div style="background:rgba(0,0,0,.07);border-left:3px solid ${isMine?'rgba(255,255,255,.5)':'var(--vert)'};padding:4px 8px;border-radius:4px;font-size:11px;color:${isMine?'rgba(255,255,255,.8)':'var(--gt)'};margin-bottom:5px">↩️ ${msg.repondreATexte||'Message'}</div>`:'';
-  const contenuHtml = msg.image
-    ? `<img src="${msg.image}" style="max-width:220px;max-height:180px;border-radius:8px;display:block;cursor:pointer" onclick="this.style.maxWidth='85vw'" alt="Image">`
-    : `<div style="font-size:13px;line-height:1.5;word-break:break-word">${escHtml(msg.texte||'').replace(/\n/g,'<br>')}</div>`;
+  let contenuHtml;
+  if(msg.audio){
+    contenuHtml=`<div style="display:flex;align-items:center;gap:8px;min-width:160px">
+      <span style="font-size:18px">🎤</span>
+      <audio controls src="${msg.audio}" style="height:32px;max-width:180px;flex:1"></audio>
+    </div>`;
+  } else if(msg.image){
+    contenuHtml=`<div>
+      <img src="${msg.image}" style="max-width:220px;max-height:180px;border-radius:8px;display:block;cursor:pointer" onclick="agrandirImg(this)" alt="Image">
+      <a href="${msg.image}" download="image_fng.jpg" style="font-size:11px;color:${isMine?'rgba(255,255,255,.75)':'var(--vert)'};text-decoration:none;display:block;margin-top:4px">⬇️ Télécharger</a>
+    </div>`;
+  } else {
+    contenuHtml=`<div style="font-size:13px;line-height:1.5;word-break:break-word">${escHtml(msg.texte||'').replace(/\n/g,'<br>')}${msg.modifie?'<span style="font-size:10px;opacity:.6;margin-left:4px">(modifié)</span>':''}</div>`;
+  }
 
-  return `<div style="display:flex;gap:8px;align-items:flex-end;${isMine?'flex-direction:row-reverse;align-self:flex-end':'align-self:flex-start'};max-width:72%">
+  const peutModifier=isMine&&!msg.image&&!msg.audio&&((new Date()-new Date(msg.date))/1000<300);
+
+  return `<div style="display:flex;gap:8px;align-items:flex-end;${isMine?'flex-direction:row-reverse;align-self:flex-end':'align-self:flex-start'};max-width:78%" onclick="setRepondre('${msg.id}',event)">
     ${avatar}
     <div>
       ${!isMine?`<div style="font-size:11px;font-weight:700;color:var(--gt);margin-bottom:3px">${escHtml(msg.auteurNom||'')}</div>`:''}
@@ -3471,8 +3487,9 @@ function renderBulle(msg, contexte){
       </div>
       <div style="font-size:10px;color:var(--gt);margin-top:3px;${isMine?'text-align:right':''}">
         ${formatMsgDate(msg.date)}
-        <button onclick="setRepondre('${msg.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--gt);margin-left:4px" title="Répondre">↩️</button>
-        ${(isMine||isAdmin())?`<button onclick="supprimerMsg('${msg.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--rouge)" title="Supprimer">🗑</button>`:''}
+        <button onclick="event.stopPropagation();setRepondre('${msg.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--gt);margin-left:6px;padding:2px 4px" title="Répondre">↩️</button>
+        ${peutModifier?`<button onclick="event.stopPropagation();modifierMsg('${msg.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--gt);padding:2px 4px" title="Modifier (5min)">✏️</button>`:''}
+        ${(isMine||isAdmin())?`<button onclick="event.stopPropagation();supprimerMsg('${msg.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--rouge);padding:2px 4px" title="Supprimer">🗑</button>`:''}
       </div>
     </div>
   </div>`;
@@ -3492,7 +3509,7 @@ function formatMsgDate(iso){
   return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 }
 
-function envoyerMessage(){
+async function envoyerMessage(){
   const input=document.getElementById('msg-input');
   const texte=(input.value||'').trim();
   if(!texte) return;
@@ -3502,19 +3519,21 @@ function envoyerMessage(){
     repondreATexte:repondreA?(repondreA.texte||'Image').slice(0,60):null};
   DB.messages.push(msg);
   input.value='';annulerReponse();renderMessages();
+  await sbInsert('messages', msg).catch(()=>{});
 }
 
-function envoyerImage(input, contexte){
+async function envoyerImage(input, contexte){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
     const img=new Image();
-    img.onload=()=>{
+    img.onload=async ()=>{
       const canvas=document.createElement('canvas');
       const maxW=800,ratio=Math.min(1,maxW/img.width);
       canvas.width=img.width*ratio;canvas.height=img.height*ratio;
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      const msg={id:'msg'+Date.now(),type:'texte',texte:'',image:canvas.toDataURL('image/jpeg',.8),
+      const b64=canvas.toDataURL('image/jpeg',.8);
+      const msg={id:'msg'+Date.now(),type:'texte',texte:'',image:b64,
         date:new Date().toISOString(),auteurId:currentUser.id,auteurNom:currentUser.prenom+' '+currentUser.nom};
       if(contexte==='prive'&&convActive){
         msg.convId=convActive;
@@ -3523,27 +3542,103 @@ function envoyerImage(input, contexte){
       } else {
         DB.messages.push(msg);renderMessages();
       }
+      await sbInsert('messages', msg).catch(()=>{});
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);input.value='';
 }
 
-function setRepondre(msgId){
+function setRepondre(msgId, event){
+  // Si appelé via click sur la bulle entière, ignorer les clics sur boutons
+  if(event&&event.target.closest('button,a,audio,img'))return;
   const msg=DB.messages.find(m=>m.id===msgId);if(!msg)return;
   repondreA=msg;
   const preview=document.getElementById('reply-preview');
-  if(preview){preview.style.display='flex';document.getElementById('reply-text').textContent='↩️ '+msg.auteurNom+' : '+(msg.texte||'Image').slice(0,50);}
-  document.getElementById('msg-input').focus();
+  if(preview){
+    preview.style.display='flex';
+    document.getElementById('reply-text').textContent='↩️ '+msg.auteurNom+' : '+(msg.texte||'🖼️ Image').slice(0,50);
+  }
+  const inp=document.getElementById('msg-input');if(inp)inp.focus();
+}
+
+function agrandirImg(el){
+  if(el.style.maxWidth==='90vw'){el.style.maxWidth='220px';}
+  else{el.style.maxWidth='90vw';el.style.maxHeight='70vh';}
+}
+
+// ── MESSAGES VOCAUX ──
+let mediaRecorder=null, audioChunks=[], enregistrement=false;
+
+async function toggleVocal(){
+  const btn=document.getElementById('btn-vocal');
+  if(!enregistrement){
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      audioChunks=[];
+      mediaRecorder=new MediaRecorder(stream);
+      mediaRecorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
+      mediaRecorder.onstop=async()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob=new Blob(audioChunks,{type:'audio/webm'});
+        if(blob.size<1000){alert('Message trop court.');return;}
+        const url=await uploadAudio(blob);
+        if(!url){alert('Erreur upload audio.');return;}
+        const msg={id:'msg'+Date.now(),type:'texte',texte:'',audio:url,
+          date:new Date().toISOString(),auteurId:currentUser.id,auteurNom:currentUser.prenom+' '+currentUser.nom,
+          repondreA:repondreA?repondreA.id:null,repondreATexte:repondreA?(repondreA.texte||'Message').slice(0,40):null};
+        DB.messages.push(msg);annulerReponse();renderMessages();
+        await sbInsert('messages',msg).catch(()=>{});
+      };
+      mediaRecorder.start();
+      enregistrement=true;
+      if(btn){btn.textContent='⏹';btn.style.background='var(--rouge)';btn.title='Arrêter l\'enregistrement';}
+    }catch(e){alert('Microphone non autorisé. Vérifiez les permissions de votre navigateur.');}
+  } else {
+    if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();
+    enregistrement=false;
+    if(btn){btn.textContent='🎤';btn.style.background='';btn.title='Message vocal';}
+  }
+}
+
+async function uploadAudio(blob){
+  try{
+    const fname='vocal_'+Date.now()+'.webm';
+    const res=await fetch(`${SUPA_URL}/storage/v1/object/forum-media/${fname}`,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'audio/webm'},
+      body:blob
+    });
+    if(!res.ok)return null;
+    return `${SUPA_URL}/storage/v1/object/public/forum-media/${fname}`;
+  }catch(e){return null;}
 }
 function annulerReponse(){
   repondreA=null;
   const p=document.getElementById('reply-preview');if(p)p.style.display='none';
 }
-function supprimerMsg(msgId){
+async function supprimerMsg(msgId){
+  const msg=DB.messages.find(m=>m.id===msgId);
+  if(!msg)return;
+  if(msg.auteurId!==currentUser.id&&!isAdmin()){alert('Vous ne pouvez supprimer que vos propres messages.');return;}
   if(!confirm('Supprimer ce message ?'))return;
   DB.messages=DB.messages.filter(m=>m.id!==msgId);
   renderMessages();if(convActive)renderMessagesPrives(convActive);
+  await sbDelete('messages', msgId).catch(()=>{});
+}
+
+let msgEnEdition=null;
+async function modifierMsg(msgId){
+  const msg=DB.messages.find(m=>m.id===msgId);
+  if(!msg||msg.auteurId!==currentUser.id)return;
+  const diff=(new Date()-new Date(msg.date))/1000;
+  if(diff>300){alert('Le délai de 5 minutes pour modifier ce message est dépassé.');return;}
+  const nouveau=prompt('Modifier le message :',msg.texte);
+  if(!nouveau||nouveau.trim()===msg.texte)return;
+  msg.texte=nouveau.trim();
+  msg.modifie=true;
+  renderMessages();if(convActive)renderMessagesPrives(convActive);
+  await sbUpdate('messages', msgId, {texte:msg.texte, modifie:true}).catch(()=>{});
 }
 
 // ── MESSAGES PRIVÉS ──
