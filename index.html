@@ -1413,6 +1413,7 @@ async function doLogin() {
     }
     document.getElementById('li-err').style.display='none';
     currentUser = user;
+    localStorage.setItem('fng_user_id', user.id);
     const loading = document.createElement('div');
     loading.id='loading-overlay';
     loading.style='position:fixed;inset:0;background:rgba(26,107,58,.9);display:flex;align-items:center;justify-content:center;z-index:9999;color:white;font-size:18px;font-weight:700';
@@ -1432,6 +1433,7 @@ async function doLogin() {
 
 function doLogout() {
   currentUser = null;
+  localStorage.removeItem('fng_user_id');
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('li-email').value='';
@@ -1871,7 +1873,7 @@ function renderComptes(){
     <tr>
       <td><strong>${u.prenom} ${u.nom}</strong><br><span style="font-size:11px;color:var(--gris-txt)">${u.email}</span></td>
       <td><span class="bg ${u.role==='president'?'bg-g':u.role==='vp'?'bg-b':'bg-gr'}">${roleLabel(u.role)}</span></td>
-      <td style="font-size:11px">${u.role==='responsable'&&u.accesVolets?Object.entries(u.accesVolets).filter(([,val])=>val!=='aucun').map(([k,val])=>`<span class="bg ${val==='ecriture'?'bg-g':'bg-o'}" style="font-size:9px;margin:1px">${k.slice(0,4)}${val==='ecriture'?'✏️':'👁'}</span>`).join(''):(u.role==='president'||u.role==='vp'?'<span class="bg bg-g" style="font-size:10px">Accès total</span>':'—')}</td>
+      <td style="font-size:11px">${u.role==='responsable'&&u.acces_volets?Object.entries(u.acces_volets).filter(([,val])=>val!=='aucun').map(([k,val])=>`<span class="bg ${val==='ecriture'?'bg-g':'bg-o'}" style="font-size:9px;margin:1px">${k.slice(0,4)}${val==='ecriture'?'✏️':'👁'}</span>`).join(''):(u.role==='president'||u.role==='vp'?'<span class="bg bg-g" style="font-size:10px">Accès total</span>':'—')}</td>
       <td><span class="bg ${u.actif?'bg-g':'bg-r'}">${u.actif?'Actif':'Inactif'}</span></td>
       <td style="white-space:nowrap;display:flex;gap:3px;flex-wrap:wrap">
         ${u.role==='responsable'?`<button class="btn btn-o btn-xs" onclick="ouvrirEditAcces('${u.id}')">🔐</button>`:''}
@@ -1888,8 +1890,8 @@ async function creerCompte(){
   if(pw.length<6){alert('Mot de passe minimum 6 caractères.');return;}
   if(DB.users.find(u=>u.email.toLowerCase()===e.toLowerCase())){alert('Cet email existe déjà.');return;}
   const r=v('mc-r');
-  const accesVolets=r==='responsable'?getVoletAccesFromModal():null;
-  const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true,accesVolets};
+  const acces_volets=r==='responsable'?getVoletAccesFromModal():null;
+  const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true,acces_volets};
   await sbInsert('users', data);
   DB.users.push(data);
   closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);renderComptes();
@@ -2279,9 +2281,9 @@ function ouvrirEditCompte(uid){
   document.getElementById('mc-pw').value='';
   document.getElementById('mc-r').value=u.role==='vp'?'vp':'responsable';
   initVoletAccessBody();
-  if(u.accesVolets){
+  if(u.acces_volets){
     SECTIONS.forEach(s=>{
-      const niv=u.accesVolets[s]||'aucun';
+      const niv=u.acces_volets[s]||'aucun';
       const radio=document.querySelector('input[name="acces-'+s+'"][value="'+niv+'"]');
       if(radio)radio.checked=true;
     });
@@ -2304,8 +2306,8 @@ async function sauvegarderEditCompte(uid){
   if(pw)u.pwd=pw;
   const r=v('mc-r');
   u.role=r==='vp'?'vp':'responsable';
-  if(r==='responsable')u.accesVolets=getVoletAccesFromModal();
-  const updateData={prenom:u.prenom,nom:u.nom,email:u.email,role:u.role,accesVolets:u.accesVolets};
+  if(r==='responsable')u.acces_volets=getVoletAccesFromModal();
+  const updateData={prenom:u.prenom,nom:u.nom,email:u.email,role:u.role,acces_volets:u.acces_volets};
   if(pw)updateData.pwd=pw;
   await sbUpdate('users', uid, updateData);
   closeM('m-compte');
@@ -2966,7 +2968,7 @@ function ouvrirEditAcces(uid){
   document.getElementById('edit-acces-info').textContent=`Droits d'accès permanents de ${u.prenom} ${u.nom}.`;
   const tbody=document.getElementById('edit-acces-body');
   tbody.innerHTML=SECTIONS.map(s=>{
-    const cur=u.accesVolets?u.accesVolets[s]:'aucun';
+    const cur=u.acces_volets?u.acces_volets[s]:'aucun';
     return `<tr>
       <td style="padding:7px 10px;font-weight:600">${VOLET_LABELS[s]||s}</td>
       ${['aucun','lecture','ecriture'].map(niv=>`
@@ -2981,9 +2983,9 @@ function ouvrirEditAcces(uid){
 async function sauvegarderAcces(){
   const u=DB.users.find(x=>x.id===editAccesUserId);
   if(!u) return;
-  if(!u.accesVolets) u.accesVolets={};
-  SECTIONS.forEach(s=>{const sel=document.querySelector(`input[name="edit-acces-${s}"]:checked`);u.accesVolets[s]=sel?sel.value:'aucun';});
-  await sbUpdate('users', u.id, {accesVolets: u.accesVolets});
+  if(!u.acces_volets) u.acces_volets={};
+  SECTIONS.forEach(s=>{const sel=document.querySelector(`input[name="edit-acces-${s}"]:checked`);u.acces_volets[s]=sel?sel.value:'aucun';});
+  await sbUpdate('users', u.id, {acces_volets: u.acces_volets});
   closeM('m-edit-acces');editAccesUserId=null;
   renderComptes();renderTableAcces();
   alert('✅ Accès mis à jour et sauvegardé.');
@@ -4261,6 +4263,31 @@ FNG — Ce document tient lieu de pièce comptable`;
   a.click();
 }
 
+// ══════════════════════════════════════
+// AUTO-LOGIN au chargement de la page
+// ══════════════════════════════════════
+(async function autoLogin() {
+  const savedId = localStorage.getItem('fng_user_id');
+  if(!savedId) return;
+  try {
+    const loading = document.createElement('div');
+    loading.id='loading-overlay';
+    loading.style='position:fixed;inset:0;background:rgba(26,107,58,.9);display:flex;align-items:center;justify-content:center;z-index:9999;color:white;font-size:18px;font-weight:700';
+    loading.textContent='⏳ Reprise de session...';
+    document.body.appendChild(loading);
+    const users = await sbGet('users', `id=eq.${encodeURIComponent(savedId)}&actif=eq.true`);
+    const user = users && users[0];
+    if(!user){ localStorage.removeItem('fng_user_id'); document.body.removeChild(loading); return; }
+    currentUser = user;
+    await loadAllData();
+    document.body.removeChild(loading);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    initApp();
+  } catch(e) {
+    localStorage.removeItem('fng_user_id');
+  }
+})();
 
 </script>
 </body>
