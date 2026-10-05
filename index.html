@@ -1369,6 +1369,11 @@ async function loadAllData() {
   DB.activites = activites || [];
   DB.beneficiaires = beneficiaires || [];
   DB.users = users || [];
+  // Rafraîchir currentUser avec les données à jour (acces_volets inclus)
+  if(currentUser) {
+    const fresh = DB.users.find(u=>u.id===currentUser.id);
+    if(fresh) currentUser = fresh;
+  }
 }
 
 let currentUser = null;
@@ -1388,7 +1393,14 @@ const PAGE_LABELS = {
 function canAccess(section) {
   if(!currentUser) return false;
   if(currentUser.role==='president'||currentUser.role==='vp') return 'ecriture';
+  // Vérifier les droits par volet (nouveau système acces_volets)
+  if(currentUser.acces_volets && currentUser.acces_volets[section]) {
+    const niv = currentUser.acces_volets[section];
+    if(niv && niv !== 'aucun') return niv; // 'lecture' ou 'ecriture'
+  }
+  // Fallback : volet principal du responsable
   if(currentUser.volet===section) return 'ecriture';
+  // Fallback : accès temporaire via demande
   const extra = DB.extraAcces.find(e=>e.userId===currentUser.id&&e.section===section);
   return extra ? extra.niveau : false;
 }
