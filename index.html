@@ -1284,46 +1284,76 @@ let numPieceCourant = 1;
 let finTabCourant = 'journal';
 
 // ══════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════
+const SUPA_URL = 'https://iiximcnipbpiequywbpj.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpeGltY25pcGJwaWVxdXl3YnBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExOTkxOTIsImV4cCI6MjEwNjc3NTE5Mn0._B51khiwzictovnRHLMNfJPGMVOtnfTP_-dPpJX6Dq4';
+
+async function sbGet(table, filters='') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filters}&order=created_at.asc`, {
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY}
+  });
+  return res.json();
+}
+
+async function sbInsert(table, data) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
+              'Content-Type': 'application/json', 'Prefer': 'return=representation'},
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+async function sbUpdate(table, id, data) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
+              'Content-Type': 'application/json', 'Prefer': 'return=representation'},
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+async function sbDelete(table, id) {
+  await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY}
+  });
+}
+
+// ══════════════════════════════════════
 // DONNÉES
 // ══════════════════════════════════════
 let DB = {
-  users: [
-    {id:'u1',prenom:'Fodé Bangaly',nom:'Chérif',email:'cherif@fng.gn',pwd:'fng2025',role:'president',volet:'tous',actif:true},
-    {id:'u2',prenom:'Fanta',nom:'TRAORÉ',email:'fanta@fng.gn',pwd:'fng2025',role:'vp',volet:'tous',actif:true},
-    {id:'u3',prenom:'Mamadou Lamine',nom:'Diallo',email:'lamine@fng.gn',pwd:'fng2025',role:'responsable',volet:'finances',actif:true},
-    {id:'u4',prenom:'Boubacar',nom:"N'diaye",email:'boubacar@fng.gn',pwd:'fng2025',role:'responsable',volet:'beneficiaires',actif:true},
-    {id:'u5',prenom:'Ibrahima',nom:'Damba',email:'ibrahima@fng.gn',pwd:'fng2025',role:'responsable',volet:'activites',actif:true},
-  ],
-  membres: [
-    {id:'m1',prenom:'Fodé Bangaly',nom:'Chérif',role:'Président',tel:'',email:'cherif@fng.gn',cotis:'À jour'},
-    {id:'m2',prenom:'Fanta',nom:'TRAORÉ',role:'Vice-Présidente',tel:'',email:'',cotis:'À jour'},
-    {id:'m3',prenom:'Ousmane N\'gaye',nom:'Keïta',role:'Général Secrétaire',tel:'',email:'',cotis:'À jour'},
-    {id:'m4',prenom:'Cécé Charle',nom:'Maomou',role:'Responsable culture, sport, citoyenneté',tel:'',email:'',cotis:'À jour'},
-    {id:'m5',prenom:'Abdoulaye',nom:'Camara',role:'Responsable Conformité & Affaires Juridiques',tel:'',email:'',cotis:'À jour'},
-    {id:'m6',prenom:'Abdoulaye',nom:'Sow',role:'Responsable logistique',tel:'',email:'',cotis:'À jour'},
-    {id:'m7',prenom:'Ibrahima',nom:'Camara',role:'Responsable adhésions & médiation',tel:'',email:'',cotis:'À jour'},
-    {id:'m8',prenom:"Paulette N'sira",nom:'BANGOURA',role:'Responsable Partenariats & représentation',tel:'',email:'',cotis:'À jour'},
-    {id:'m9',prenom:'Boubacar',nom:"N'diaye",role:'Responsable Éducation & Insertion Jeunes',tel:'',email:'',cotis:'À jour'},
-    {id:'m10',prenom:'Ibrahima',nom:'Damba',role:'Responsable Communication impact',tel:'',email:'',cotis:'À jour'},
-    {id:'m11',prenom:'Mamadou Lamine',nom:'Diallo',role:'Responsable Finances & Stratégie de Fonds',tel:'',email:'',cotis:'À jour'},
-    {id:'m12',prenom:'Aïssatou',nom:'Camara',role:'Adjointe Communication Impact',tel:'',email:'',cotis:'À jour'},
-    {id:'m13',prenom:'Ramatoulaye',nom:'SYLLA',role:'Adjointe Finances & Stratégie de Fonds',tel:'',email:'',cotis:'À jour'},
-    {id:'m14',prenom:'Mohamed Seydou',nom:'Soumah',role:'Responsable Recherche Innovation Sociale',tel:'',email:'',cotis:'À jour'},
-    {id:'m15',prenom:'Nana',nom:'Camara',role:'Adjointe Recherche & Innovation Sociale',tel:'',email:'',cotis:'À jour'},
-  ],
+  users: [],
+  membres: [],
   transactions: [],
-  activites: [
-    {id:'a1',nom:'Appui scolaire aux enfants démunis',debut:'2025-10-01',fin:'2025-10-01',volet:'Éducation',statut:'réalisée',benef:15,budget:0,desc:'Distribution de fournitures scolaires complètes à 15 enfants démunis. Financée sur fonds propres des membres FNG.'}
-  ],
+  activites: [],
   beneficiaires: [],
   notifications: [],
-  // accès supplémentaires: {userId, section, niveau:'lecture'|'ecriture'}
   extraAcces: [],
   partenaires: [],
   notifsProjet: [],
   messages: [],
   reunions: []
 };
+
+async function loadAllData() {
+  const [membres, transactions, activites, beneficiaires, users] = await Promise.all([
+    sbGet('membres'),
+    sbGet('transactions','order=created_at.desc'),
+    sbGet('activites'),
+    sbGet('beneficiaires'),
+    sbGet('users')
+  ]);
+  DB.membres = membres || [];
+  DB.transactions = (transactions || []).map(t=>({...t, montant: parseFloat(t.montant)||0}));
+  DB.activites = activites || [];
+  DB.beneficiaires = beneficiaires || [];
+  DB.users = users || [];
+}
 
 let currentUser = null;
 
@@ -1351,16 +1381,36 @@ function isAdmin() { return currentUser && (currentUser.role==='president'||curr
 // ══════════════════════════════════════
 // LOGIN / LOGOUT
 // ══════════════════════════════════════
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('li-email').value.trim().toLowerCase();
   const pwd = document.getElementById('li-pwd').value;
-  const user = DB.users.find(u=>u.email.toLowerCase()===email && u.pwd===pwd && u.actif);
-  if(!user) { document.getElementById('li-err').style.display='block'; return; }
-  document.getElementById('li-err').style.display='none';
-  currentUser = user;
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
-  initApp();
+  const btn = document.querySelector('#login-screen .btn-full');
+  if(btn){btn.textContent='Connexion...';btn.disabled=true;}
+  try {
+    const users = await sbGet('users', `email=eq.${encodeURIComponent(email)}&pwd=eq.${encodeURIComponent(pwd)}&actif=eq.true`);
+    const user = users && users[0];
+    if(!user) {
+      document.getElementById('li-err').style.display='block';
+      if(btn){btn.textContent='Se connecter';btn.disabled=false;}
+      return;
+    }
+    document.getElementById('li-err').style.display='none';
+    currentUser = user;
+    const loading = document.createElement('div');
+    loading.id='loading-overlay';
+    loading.style='position:fixed;inset:0;background:rgba(26,107,58,.9);display:flex;align-items:center;justify-content:center;z-index:9999;color:white;font-size:18px;font-weight:700';
+    loading.textContent='⏳ Chargement des données...';
+    document.body.appendChild(loading);
+    await loadAllData();
+    document.body.removeChild(loading);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    initApp();
+  } catch(e) {
+    document.getElementById('li-err').textContent='Erreur de connexion. Vérifiez votre réseau.';
+    document.getElementById('li-err').style.display='block';
+    if(btn){btn.textContent='Se connecter';btn.disabled=false;}
+  }
 }
 
 function doLogout() {
@@ -1548,7 +1598,13 @@ function addMembre() {
   DB.membres.push({id:'m'+Date.now(),prenom:p,nom:n,role:r,tel:v('mm-t'),email:v('mm-e'),cotis:v('mm-c')});
   closeM('m-membre');clear(['mm-p','mm-n','mm-r','mm-t','mm-e']);renderMembres();
 }
-function supprimerMembre(i){if(confirm('Retirer ce membre ?')){DB.membres.splice(i,1);renderMembres();}}
+async function supprimerMembre(id){
+  if(confirm('Retirer ce membre ?')){
+    await sbDelete('membres', id);
+    DB.membres=DB.membres.filter(m=>m.id!==id);
+    renderMembres();
+  }
+}
 
 // ══════════════════════════════════════
 // FINANCES
@@ -1582,11 +1638,16 @@ function renderFinances(){
 }
 
 
-function addTransaction(){
-  const d=v('mf-d'),desc=v('mf-desc'),m=parseFloat(v('mf-m'));
+async function addTransaction(){
+  const d=v('mf-date'),desc=v('mf-desc'),m=parseFloat(v('mf-montant'));
+  const type=document.getElementById('mf-type')?document.getElementById('mf-type').value:finTypeCourant;
   if(!d||!desc||!m){alert('Champs obligatoires manquants.');return;}
-  DB.transactions.unshift({id:'f'+Date.now(),date:d,desc,cat:v('mf-cat'),type:v('mf-t'),montant:m});
-  closeM('m-fin');clear(['mf-d','mf-desc','mf-m']);renderFinances();
+  const data={id:'f'+Date.now(),date:d,description:desc,categorie:v('mf-cat'),type,montant:m,
+    mode:v('mf-mode')||'',piece:v('mf-piece')||'',activite:v('mf-activite')||'',
+    beneficiaire:v('mf-benef')||'',notes:v('mf-notes')||'',statut:'validé'};
+  await sbInsert('transactions', data);
+  DB.transactions.unshift({...data});
+  closeM('m-fin');renderFinances();
 }
 
 // ══════════════════════════════════════
@@ -1610,7 +1671,7 @@ function renderActivites(){
         <span class="bg ${a.statut==='réalisée'?'bg-g':a.statut==='en cours'?'bg-o':'bg-gr'}">${a.statut}</span>
       </div>
       <div class="cb">
-        <p style="font-size:13px;color:var(--gris-txt);margin-bottom:10px">${a.desc||'—'}</p>
+        <p style="font-size:13px;color:var(--gris-txt);margin-bottom:10px">${a.description||a.desc||'—'}</p>
         <div style="display:flex;gap:18px;font-size:13px">
           <span>👥 <strong>${a.benef||0}</strong> bénéficiaires</span>
           <span>💰 <strong>${(a.budget||0).toLocaleString()}</strong> GNF</span>
@@ -1619,9 +1680,11 @@ function renderActivites(){
     </div>`).join('');
 }
 function filtActiv(f,el){filtreAct=f;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderActivites();}
-function addActivite(){
+async function addActivite(){
   const n=v('ma-n');if(!n){alert('Nom obligatoire.');return;}
-  DB.activites.unshift({id:'ac'+Date.now(),nom:n,debut:v('ma-d'),fin:v('ma-f'),volet:v('ma-v'),statut:v('ma-s'),benef:parseInt(v('ma-b'))||0,budget:parseFloat(v('ma-bg'))||0,desc:v('ma-desc')});
+  const data={id:'ac'+Date.now(),nom:n,debut:v('ma-d'),fin:v('ma-f'),volet:v('ma-v'),statut:v('ma-s'),benef:parseInt(v('ma-b'))||0,budget:parseFloat(v('ma-bg'))||0,description:v('ma-desc')};
+  await sbInsert('activites', data);
+  DB.activites.unshift(data);
   closeM('m-activ');clear(['ma-n','ma-d','ma-f','ma-b','ma-bg','ma-desc']);renderActivites();
 }
 
@@ -1801,13 +1864,15 @@ function renderComptes(){
     </tr>`).join('');
 }
 
-function creerCompte(){
+async function creerCompte(){
   const p=v('mc-p'),n=v('mc-n'),e=v('mc-e'),pw=v('mc-pw');
   if(!p||!e||!pw){alert('Champs obligatoires manquants.');return;}
   if(pw.length<6){alert('Mot de passe minimum 6 caractères.');return;}
   if(DB.users.find(u=>u.email.toLowerCase()===e.toLowerCase())){alert('Cet email existe déjà.');return;}
   const r=v('mc-r');
-  DB.users.push({id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true});
+  const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true};
+  await sbInsert('users', data);
+  DB.users.push(data);
   closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);renderComptes();
   alert(`Compte créé pour ${p} ${n}.\nEmail : ${e}\nMDP : ${pw}`);
 }
@@ -2363,24 +2428,30 @@ function ouvrirModalMembre(id){
   openM('m-membre');
 }
 
-function saveMembre(){
+async function saveMembre(){
   const prenom=v('mm-prenom'),nom=v('mm-nom'),role=v('mm-role'),tel=v('mm-tel'),adhesion=v('mm-adhesion');
   if(!prenom||!role||!tel||!adhesion){alert('Prénom, rôle, téléphone et date adhésion obligatoires.');return;}
   const data={prenom,nom,role,tel,adhesion,
     ddn:v('mm-ddn'),sexe:document.getElementById('mm-sexe').value,
     nationalite:v('mm-nationalite'),quartier:v('mm-quartier'),
     email:v('mm-email'),adresse:v('mm-adresse'),
-    type:document.getElementById('mm-type').value,
+    type_adhesion:document.getElementById('mm-type').value,
     cotis:document.getElementById('mm-cotis').value,
     statut:document.getElementById('mm-statut').value,
     numero:v('mm-num')||genNumMembre(),
+    niveau:v('mm-niveau'),
     formation:v('mm-formation'),competences:v('mm-competences'),
     photo:document.getElementById('membre-photo-data').value||null,
-    dateSortie:v('mm-date-sortie'),
-    motifSortie:'',
-    obsSortie:v('mm-obs-sortie')};
-  if(membreEnEdition){Object.assign(membreEnEdition,data);}
-  else{data.id='m'+Date.now();DB.membres.push(data);}
+    date_sortie:v('mm-date-sortie'),
+    obs_sortie:v('mm-obs-sortie')};
+  if(membreEnEdition){
+    await sbUpdate('membres', membreEnEdition.id, data);
+    Object.assign(membreEnEdition, data);
+  } else {
+    data.id='m'+Date.now();
+    await sbInsert('membres', data);
+    DB.membres.push(data);
+  }
   closeM('m-membre');membreEnEdition=null;renderMembres();
 }
 
@@ -2393,13 +2464,12 @@ function ouvrirSortieMembre(id){
   openM('m-sortie');
 }
 
-function confirmerSortie(){
+async function confirmerSortie(){
   const date=document.getElementById('s-date').value;
   if(!date){alert('Date obligatoire.');return;}
-  membreEnSortie.statut='Sortant';
-  membreEnSortie.dateSortie=date;
-  membreEnSortie.motifSortie=document.getElementById('s-motif').value;
-  membreEnSortie.obsSortie=document.getElementById('s-obs').value;
+  const updates={statut:'Sortant',date_sortie:date,obs_sortie:document.getElementById('s-obs').value};
+  await sbUpdate('membres', membreEnSortie.id, updates);
+  Object.assign(membreEnSortie, updates);
   closeM('m-sortie');membreEnSortie=null;renderMembres();
 }
 
@@ -3622,13 +3692,13 @@ function voirDetailTransaction(id){
   document.getElementById('detail-trans-body').innerHTML = `
     <div style="text-align:center;margin-bottom:16px">
       <div style="font-size:28px;font-weight:900;color:${color}">${sign}${t.montant.toLocaleString()} GNF</div>
-      <div style="font-size:13px;color:var(--gris-txt);margin-top:4px">${t.desc}</div>
+      <div style="font-size:13px;color:var(--gris-txt);margin-top:4px">${t.description||t.desc||''}</div>
       <div style="margin-top:8px"><span class="bg ${t.statut==='validé'?'bg-g':t.statut==='en attente'?'bg-o':'bg-r'}">${t.statut}</span></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
       <div>📋 <strong>N° pièce :</strong> ${t.numPiece||'—'}</div>
       <div>📅 <strong>Date :</strong> ${t.date}</div>
-      <div>🏷️ <strong>Catégorie :</strong> ${t.cat}</div>
+      <div>🏷️ <strong>Catégorie :</strong> ${t.categorie||t.cat||'—'}</div>
       <div>💳 <strong>Mode :</strong> ${t.mode||'—'}</div>
       ${t.benef?`<div>👤 <strong>Bénéf./Fourn. :</strong> ${t.benef}</div>`:''}
       ${t.piece?`<div>📎 <strong>Pièce justif. :</strong> ${t.piece}</div>`:''}
@@ -3645,8 +3715,8 @@ function voirDetailTransaction(id){
 function ouvrirValiderDepense(id){
   transEnValidation = DB.transactions.find(t=>t.id===id); if(!transEnValidation) return;
   document.getElementById('val-dep-info').innerHTML =
-    `<strong>${transEnValidation.desc}</strong><br>
-     Montant : <strong>${transEnValidation.montant.toLocaleString()} GNF</strong> · Cat : ${transEnValidation.cat}<br>
+    `<strong>${transEnValidation.description||transEnValidation.desc||''}</strong><br>
+     Montant : <strong>${transEnValidation.montant.toLocaleString()} GNF</strong> · Cat : ${transEnValidation.categorie||transEnValidation.cat||'—'}<br>
      Demandé par : <strong>${transEnValidation.enregistrePar}</strong> le ${transEnValidation.date}`;
   document.getElementById('val-dep-obs').value='';
   openM('m-val-depense');
@@ -3700,7 +3770,7 @@ function renderJournal(){
   const type=document.getElementById('fin-filter-type')?document.getElementById('fin-filter-type').value:'';
   const mois=document.getElementById('fin-filter-mois')?document.getElementById('fin-filter-mois').value:'';
   let data=[...DB.transactions].reverse();
-  if(cat) data=data.filter(t=>t.cat===cat);
+  if(cat) data=data.filter(t=>(t.categorie||t.cat)===cat);
   if(type) data=data.filter(t=>t.type===type);
   if(mois) data=data.filter(t=>t.date&&t.date.startsWith(mois));
   const cnt=document.getElementById('fin-journal-cnt');
@@ -3713,8 +3783,8 @@ function renderJournal(){
     return `<tr>
       <td style="font-size:11px;color:var(--gris-txt)">${t.numPiece||'—'}</td>
       <td style="font-size:12px">${t.date}</td>
-      <td style="font-size:12px;max-width:180px"><strong>${t.desc}</strong>${t.benef?`<br><span style="font-size:11px;color:var(--gris-txt)">${t.benef}</span>`:''}</td>
-      <td><span class="bg bg-gr" style="font-size:10px">${t.cat}</span></td>
+      <td style="font-size:12px;max-width:180px"><strong>${t.description||t.desc||''}</strong>${t.beneficiaire||t.benef?`<br><span style="font-size:11px;color:var(--gris-txt)">${t.beneficiaire||t.benef}</span>`:''}</td>
+      <td><span class="bg bg-gr" style="font-size:10px">${t.categorie||t.cat||'—'}</span></td>
       <td><span class="bg ${t.type==='entrée'?'bg-g':'bg-r'}" style="font-size:10px">${t.type}</span></td>
       <td style="font-weight:700;color:${t.type==='entrée'?'var(--vert2)':'var(--rouge)'}">
         ${t.type==='entrée'?'+':'-'}${t.montant.toLocaleString()}
@@ -3756,7 +3826,7 @@ function renderBudget(){
   if(dr){
     const byCat={};
     DB.transactions.filter(t=>t.type==='sortie'&&(t.statut==='validé'||t.statut==='approuvé')).forEach(t=>{
-      byCat[t.cat]=(byCat[t.cat]||0)+t.montant;
+      const _cat=t.categorie||t.cat||'Autre';byCat[_cat]=(byCat[_cat]||0)+t.montant;
     });
     const total=Object.values(byCat).reduce((s,v)=>s+v,0)||1;
     dr.innerHTML=Object.entries(byCat).length?Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
@@ -3794,8 +3864,8 @@ function renderBilan(){
   const solde=entrees-sorties;
   // Par catégorie entrées
   const catE={},catS={};
-  valides.filter(t=>t.type==='entrée').forEach(t=>{catE[t.cat]=(catE[t.cat]||0)+t.montant;});
-  valides.filter(t=>t.type==='sortie').forEach(t=>{catS[t.cat]=(catS[t.cat]||0)+t.montant;});
+  valides.filter(t=>t.type==='entrée').forEach(t=>{const c=t.categorie||t.cat||'Autre';catE[c]=(catE[c]||0)+t.montant;});
+  valides.filter(t=>t.type==='sortie').forEach(t=>{const c=t.categorie||t.cat||'Autre';catS[c]=(catS[c]||0)+t.montant;});
   // Résultats
   const br=document.getElementById('bilan-resultats');
   if(br)br.innerHTML=`
@@ -3856,8 +3926,8 @@ function renderValidations(){
       <div class="notif-item">
         <div class="ni-icon">📤</div>
         <div class="ni-text">
-          <div class="nt">${t.desc}</div>
-          <div class="ns2">${t.montant.toLocaleString()} GNF · ${t.cat} · Demandé par <strong>${t.enregistrePar}</strong> le ${t.date}</div>
+          <div class="nt">${t.description||t.desc||''}</div>
+          <div class="ns2">${t.montant.toLocaleString()} GNF · ${t.categorie||t.cat||'—'} · Demandé par <strong>${t.enregistrePar||currentUser.prenom}</strong> le ${t.date}</div>
         </div>
         ${isAdmin()?`<div class="ni-actions">
           <button class="btn btn-o btn-xs" onclick="voirDetailTransaction('${t.id}')">👁</button>
@@ -3870,7 +3940,7 @@ function renderValidations(){
   const tbody=document.getElementById('tbody-validations-hist');
   if(tbody){
     tbody.innerHTML=hist.length?hist.map(t=>`<tr>
-      <td>${t.date}</td><td>${t.desc}</td>
+      <td>${t.date}</td><td>${t.description||t.desc||''}</td>
       <td style="font-weight:700">${t.montant.toLocaleString()} GNF</td>
       <td style="font-size:12px">${t.enregistrePar||'—'}</td>
       <td style="font-size:12px">${t.valideParNom||'—'}</td>
@@ -3892,7 +3962,7 @@ function renderAudit(){
       <td style="font-size:11px;font-weight:700;color:var(--vert)">${t.numPiece||'—'}</td>
       <td style="font-size:12px">${t.date}</td>
       <td><span class="bg ${t.type==='entrée'?'bg-g':'bg-r'}" style="font-size:10px">${t.type}</span></td>
-      <td style="font-size:12px;max-width:160px">${t.desc}</td>
+      <td style="font-size:12px;max-width:160px">${t.description||t.desc||''}</td>
       <td style="color:var(--vert2);font-weight:${t.type==='entrée'?700:400}">${t.type==='entrée'?t.montant.toLocaleString():'—'}</td>
       <td style="color:var(--rouge);font-weight:${t.type==='sortie'?700:400}">${t.type==='sortie'?t.montant.toLocaleString():'—'}</td>
       <td style="font-weight:700;color:${solde>=0?'var(--vert)':'var(--rouge)'}">${isValide?solde.toLocaleString():'—'}</td>
@@ -3916,7 +3986,7 @@ function genererRapportAudit(){
 
 function exportJournalCSV(){
   const h=['N° Pièce','Date','Libellé','Catégorie','Type','Montant GNF','Mode','Bénéf/Fourn','Réf. Pièce','Statut','Enregistré par'];
-  const r=DB.transactions.map(t=>[t.numPiece||'',t.date,t.desc,t.cat,t.type,t.montant,t.mode||'',t.benef||'',t.piece||'',t.statut,t.enregistrePar||'']);
+  const r=DB.transactions.map(t=>[t.numPiece||'',t.date,t.description||t.desc||'',t.categorie||t.cat||'',t.type,t.montant,t.mode||'',t.beneficiaire||t.benef||'',t.piece||'',t.statut,t.enregistrePar||'']);
   dlCSV('Journal_FNG_'+new Date().toISOString().slice(0,10)+'.csv',h,r);
 }
 
@@ -3942,7 +4012,7 @@ Solde net       : ${(e-s).toLocaleString()} GNF
 ${'─'.repeat(60)}
 DÉTAIL DES OPÉRATIONS
 ${'─'.repeat(60)}
-${DB.transactions.map(t=>`[${t.numPiece||'—'}] ${t.date} | ${t.type.toUpperCase()} | ${t.desc} | ${t.montant.toLocaleString()} GNF | ${t.statut}`).join('\n')}
+${DB.transactions.map(t=>`[${t.numPiece||'—'}] ${t.date} | ${t.type.toUpperCase()} | ${t.description||t.desc||''} | ${t.montant.toLocaleString()} GNF | ${t.statut}`).join('\n')}
 
 ${'═'.repeat(60)}
 FNG — Donner un avenir à nos racines`;
