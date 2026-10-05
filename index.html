@@ -955,21 +955,28 @@ tr:hover td{background:var(--vert-pale)}
     <div class="fgg full"><label>Email *</label><input id="mc-e" type="email" placeholder="email@exemple.com"></div>
     <div class="fgg"><label>Mot de passe *</label><input id="mc-pw" type="password" placeholder="Minimum 6 caractères"></div>
     <div class="fgg"><label>Rôle système</label>
-      <select id="mc-r">
+      <select id="mc-r" onchange="toggleVoletConfig();initVoletAccessBody()">
         <option value="responsable">Responsable</option>
         <option value="vp">Vice-Président(e)</option>
         <option value="president">Président</option>
       </select>
     </div>
-    <div class="fgg full"><label>Volet principal (si responsable)</label>
-      <select id="mc-v">
-        <option value="membres">Membres</option>
-        <option value="finances">Finances</option>
-        <option value="activites">Activités & Projets</option>
-        <option value="beneficiaires">Bénéficiaires</option>
-        <option value="rapports">Rapports</option>
-        <option value="documents">Documents</option>
-      </select>
+    <div id="volet-config" style="display:none" class="fgg full">
+      <label>Droits d'accès par volet</label>
+      <div style="border:1px solid var(--gris-leg);border-radius:8px;overflow:hidden;margin-top:4px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:var(--vert-pale)">
+            <th style="padding:7px 10px;text-align:left">Volet</th>
+            <th style="text-align:center;padding:7px 6px;width:70px">Aucun</th>
+            <th style="text-align:center;padding:7px 6px;width:70px">Lecture</th>
+            <th style="text-align:center;padding:7px 6px;width:80px">Écriture</th>
+          </tr></thead>
+          <tbody id="volet-access-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="vp-info" style="display:none" class="fgg full">
+      <div class="alert" style="background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-pale2)">Le Vice-Président a accès à tous les volets en lecture et écriture.</div>
     </div>
   </div></div>
   <div class="mf"><button class="btn btn-o" onclick="closeM('m-compte')">Annuler</button><button class="btn btn-p" onclick="creerCompte()">Créer le compte</button></div>
@@ -1512,7 +1519,7 @@ function renderDashboard() {
   // Stats
   const stats = document.getElementById('dash-stats');
   let s = `<div class="sc acc"><div class="lb">Membres actifs</div><div class="vl">${DB.membres.length}</div><div class="sb">équipe FNG</div></div>`;
-  s += `<div class="sc"><div class="lb">Bénéficiaires</div><div class="vl">${DB.beneficiaires.length||15}</div><div class="sb">touchés</div></div>`;
+  s += `<div class="sc"><div class="lb">Bénéficiaires</div><div class="vl">${DB.beneficiaires.length}</div><div class="sb">touchés</div></div>`;
   s += `<div class="sc"><div class="lb">Activités</div><div class="vl">${DB.activites.length}</div><div class="sb">réalisées / planifiées</div></div>`;
   if(isAd||canAccess('finances')) {
     const e=DB.transactions.filter(t=>t.type==='entrée').reduce((s,t)=>s+t.montant,0);
@@ -1532,7 +1539,7 @@ function renderDashboard() {
   // Progress
   const pr = document.getElementById('dash-progress');
   const prog = [
-    ['Enfants accompagnés',DB.beneficiaires.filter(b=>+b.age<=16).length+15,200],
+    ['Enfants accompagnés',DB.beneficiaires.filter(b=>b.cat&&b.cat.includes('Enfant')).length,200],
     ['Jeunes formés',0,100],['Personnes sensibilisées',0,3000],['Événements culturels',0,4]
   ];
   pr.innerHTML = prog.map(([l,v,m])=>`
@@ -2904,13 +2911,15 @@ function revoquerAcces(userId,section){
 }
 
 function toggleVoletConfig(){
-  const r=document.getElementById('mc-r').value;
-  document.getElementById('volet-config').style.display=r==='responsable'?'block':'none';
-  document.getElementById('vp-info').style.display=r==='vp'?'block':'none';
+  const mcr=document.getElementById('mc-r');if(!mcr)return;
+  const r=mcr.value;
+  const vc=document.getElementById('volet-config');if(vc)vc.style.display=r==='responsable'?'block':'none';
+  const vi=document.getElementById('vp-info');if(vi)vi.style.display=r==='vp'?'block':'none';
 }
 
 function initVoletAccessBody(){
   const tbody=document.getElementById('volet-access-body');
+  if(!tbody)return;
   tbody.innerHTML=SECTIONS.map(s=>`<tr>
     <td style="padding:7px 10px;font-weight:600">${VOLET_LABELS[s]||s}</td>
     ${['aucun','lecture','ecriture'].map(niv=>`
