@@ -661,32 +661,98 @@ tr:hover td{background:var(--vert-pale)}
 <!-- ══════ MODALS ══════ -->
 
 <!-- Modal Membre -->
-<div class="mo" id="m-membre"><div class="mb">
-  <div class="mh"><div class="mt">Ajouter un membre</div><button class="mc" onclick="closeM('m-membre')">×</button></div>
-  <div class="mbody"><div class="fg2">
-    <div class="fgg"><label>Prénom *</label><input id="mm-p" placeholder="Prénom"></div>
-    <div class="fgg"><label>Nom *</label><input id="mm-n" placeholder="Nom"></div>
-    <div class="fgg full"><label>Rôle *</label><input id="mm-r" placeholder="ex: Responsable Communication"></div>
-    <div class="fgg"><label>Téléphone</label><input id="mm-t" placeholder="+224 6XX XX XX XX"></div>
-    <div class="fgg"><label>Email</label><input id="mm-e" placeholder="email@exemple.com"></div>
-    <div class="fgg full"><label>Statut cotisation</label>
-      <select id="mm-c"><option>À jour</option><option>En retard</option><option>Exonéré</option></select>
+<div class="mo" id="m-membre" style="align-items:flex-start;padding-top:20px"><div class="mb" style="max-width:700px;margin:auto">
+  <div class="mh">
+    <div><div class="mt" id="m-membre-titre">Ajouter un membre</div><div style="font-size:11px;color:var(--gris-txt);margin-top:2px">Les champs * sont obligatoires</div></div>
+    <button class="mc" onclick="closeM('m-membre')">×</button>
+  </div>
+  <div class="mbody">
+    <!-- Photo -->
+    <div style="text-align:center;margin-bottom:18px">
+      <div id="membre-photo-preview" style="width:90px;height:90px;border-radius:50%;background:var(--gris-leg);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 10px;border:3px solid var(--vert);overflow:hidden">👤</div>
+      <input type="hidden" id="membre-photo-data">
+      <button class="btn btn-o" style="font-size:12px;padding:5px 12px" onclick="document.getElementById('membre-photo-input').click()">📁 Importer photo</button>
+      <input type="file" id="membre-photo-input" accept="image/*" style="display:none" onchange="previewMembrePhoto(this)">
     </div>
-  </div></div>
-  <div class="mf"><button class="btn btn-o" onclick="closeM('m-membre')">Annuler</button><button class="btn btn-p" onclick="addMembre()">Enregistrer</button></div>
+    <!-- IDENTITÉ -->
+    <div style="background:var(--vert);color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin-bottom:14px">👤 IDENTITÉ</div>
+    <div class="fg2">
+      <div class="fgg"><label>Prénom *</label><input id="mm-prenom" placeholder="Prénom"></div>
+      <div class="fgg"><label>Nom *</label><input id="mm-nom" placeholder="Nom"></div>
+      <div class="fgg"><label>Date de naissance</label><input type="date" id="mm-ddn"></div>
+      <div class="fgg"><label>Sexe</label><select id="mm-sexe"><option value="M">Masculin</option><option value="F">Féminin</option></select></div>
+      <div class="fgg"><label>Nationalité</label><input id="mm-nationalite" value="Guinéenne" placeholder="Guinéenne"></div>
+      <div class="fgg"><label>Quartier / Localité</label><input id="mm-quartier" placeholder="ex: Kolisoko"></div>
+    </div>
+    <!-- CONTACT -->
+    <div style="background:var(--vert);color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin:18px 0 14px">📞 CONTACT</div>
+    <div class="fg2">
+      <div class="fgg"><label>Téléphone *</label><input id="mm-tel" placeholder="+224 6XX XX XX XX"></div>
+      <div class="fgg"><label>Email</label><input id="mm-email" placeholder="email@exemple.com"></div>
+      <div class="fgg full"><label>Adresse complète</label><input id="mm-adresse" placeholder="Rue, quartier, ville"></div>
+    </div>
+    <!-- RÔLE & ADHÉSION -->
+    <div style="background:var(--vert);color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin:18px 0 14px">🏷️ RÔLE &amp; ADHÉSION</div>
+    <div class="fg2">
+      <div class="fgg full"><label>Rôle dans FNG *</label><input id="mm-role" placeholder="ex: Responsable Finances &amp; Stratégie de Fonds"></div>
+      <div class="fgg"><label>Date d'adhésion *</label><input type="date" id="mm-adhesion"></div>
+      <div class="fgg"><label>Type de membre</label><select id="mm-type"><option>Adhérent actif</option><option>Membre fondateur</option><option>Membre honoraire</option><option>Bénévole</option></select></div>
+      <div class="fgg"><label>Statut cotisation</label><select id="mm-cotis"><option>À jour</option><option>En retard</option><option>Exonéré</option></select></div>
+      <div class="fgg"><label>Statut membre</label><select id="mm-statut"><option>Actif</option><option>Inactif</option><option>Suspendu</option><option>Sorti</option></select></div>
+      <div class="fgg"><label>Numéro de membre</label><input id="mm-num" placeholder="Auto-généré" readonly style="background:#f9f9f9"></div>
+    </div>
+    <!-- FORMATION -->
+    <div style="background:var(--vert);color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin:18px 0 14px">🎓 FORMATION &amp; COMPÉTENCES</div>
+    <div class="fg2">
+      <div class="fgg full"><label>Niveau d'études</label><select id="mm-niveau"><option value="">—</option><option>Primaire</option><option>Secondaire</option><option>Baccalauréat</option><option>Licence</option><option>Master</option><option>Doctorat</option><option>Formation professionnelle</option></select></div>
+      <div class="fgg full"><label>Domaine de formation / Métier</label><input id="mm-formation" placeholder="ex: Comptabilité, Informatique…"></div>
+      <div class="fgg full"><label>Compétences clés</label><textarea id="mm-competences" placeholder="ex: Communication, gestion de projet, réseaux sociaux…" rows="2"></textarea></div>
+    </div>
+    <!-- SORTIE -->
+    <div id="sortie-section" style="display:none">
+      <div style="background:#c0392b;color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin:18px 0 14px">🚪 SORTIE DU MEMBRE</div>
+      <div class="fg2">
+        <div class="fgg"><label>Date de sortie</label><input type="date" id="mm-date-sortie"></div>
+        <div class="fgg full"><label>Observations</label><textarea id="mm-obs-sortie" rows="2" placeholder="Motif, remarques…"></textarea></div>
+      </div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-o" onclick="closeM('m-membre')">Annuler</button><button class="btn btn-p" onclick="saveMembre()">Enregistrer</button></div>
 </div></div>
 
 <!-- Modal Finance -->
-<div class="mo" id="m-fin"><div class="mb">
-  <div class="mh"><div class="mt">Nouvelle transaction</div><button class="mc" onclick="closeM('m-fin')">×</button></div>
+<div class="mo" id="m-fin" style="align-items:flex-start;padding-top:20px"><div class="mb" style="max-width:650px;margin:auto">
+  <div class="mh">
+    <div><div class="mt" id="m-fin-titre">💰 Nouvelle entrée</div><div style="font-size:11px;color:var(--gris-txt);margin-top:2px">Les champs * sont obligatoires</div></div>
+    <button class="mc" onclick="closeM('m-fin')">×</button>
+  </div>
   <div class="mbody"><div class="fg2">
-    <div class="fgg"><label>Date *</label><input type="date" id="mf-d"></div>
-    <div class="fgg"><label>Type *</label><select id="mf-t"><option value="entrée">Entrée</option><option value="sortie">Sortie / Dépense</option></select></div>
-    <div class="fgg full"><label>Description *</label><input id="mf-desc" placeholder="ex: Achat fournitures scolaires"></div>
-    <div class="fgg"><label>Catégorie</label><select id="mf-cat"><option>Cotisation membres</option><option>Don / Sponsoring</option><option>Fournitures scolaires</option><option>Événement</option><option>Transport</option><option>Communication</option><option>Autre</option></select></div>
-    <div class="fgg"><label>Montant (GNF) *</label><input type="number" id="mf-m" placeholder="ex: 500000"></div>
+    <input type="hidden" id="mf-type" value="entrée">
+    <div class="fgg"><label>Date *</label><input type="date" id="mf-date"></div>
+    <div class="fgg"><label>Libellé / Description *</label><input id="mf-desc" placeholder="ex: Achat fournitures scolaires"></div>
+    <div class="fgg"><label>Catégorie *</label>
+      <select id="mf-cat" onchange="onFinTypeChange()">
+        <option>Cotisation membres</option><option>Don / Sponsoring</option><option>Subvention</option>
+        <option>Fournitures &amp; matériel</option><option>Transport &amp; déplacement</option>
+        <option>Communication</option><option>Événement &amp; animation</option><option>Salaires &amp; honoraires</option><option>Autre</option>
+      </select>
+    </div>
+    <div class="fgg"><label>Montant (GNF) *</label><input type="number" id="mf-montant" placeholder="ex: 500000"></div>
+    <div class="fgg"><label>Mode de paiement</label>
+      <select id="mf-mode"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Chèque</option></select>
+    </div>
+    <div class="fgg"><label>N° pièce justificative</label><input id="mf-piece" placeholder="Reçu, facture…"></div>
+    <div class="fgg"><label>Activité liée</label><select id="mf-activite"><option value="">— Aucune —</option></select></div>
+    <div class="fgg"><label>Bénéficiaire / Fournisseur</label><input id="mf-benef" placeholder="Nom de la personne ou structure"></div>
+    <div id="approbation-info" style="display:none" class="fgg full">
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px;font-size:12px">⚠️ Les dépenses doivent être approuvées par le Président ou la VP.</div>
+    </div>
+    <div class="fgg full"><label>Notes internes</label><textarea id="mf-notes" rows="2" placeholder="Remarques, contexte…"></textarea></div>
   </div></div>
-  <div class="mf"><button class="btn btn-o" onclick="closeM('m-fin')">Annuler</button><button class="btn btn-p" onclick="addTransaction()">Enregistrer</button></div>
+  <div class="mf">
+    <button class="btn btn-o" onclick="closeM('m-fin')">Annuler</button>
+    <button class="btn btn-p" id="mf-btn-submit" onclick="saveTransaction()">Enregistrer</button>
+  </div>
 </div></div>
 
 <!-- Modal Activité -->
@@ -2240,6 +2306,18 @@ function imprimerBadgeSeul(id,type){
   openM(type==='membre'?'m-badges':'m-badges-benef');
 }
 
+function previewMembrePhoto(input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const prev=document.getElementById('membre-photo-preview');
+    prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    prev.style.background='none';
+    document.getElementById('membre-photo-data').value=e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
 function genNumMembre(){
   const n = DB.membres.filter(m=>m.numero).length + 1;
   return 'FNG-M-' + String(n).padStart(3,'0');
@@ -2268,7 +2346,7 @@ function ouvrirModalMembre(id){
     document.getElementById('mm-type').value=m.type||'Adhérent actif';
     document.getElementById('mm-cotis').value=m.cotis||'À jour';
     document.getElementById('mm-statut').value=m.statut||'Actif';
-    document.getElementById('mm-numero').value=m.numero||'';
+    document.getElementById('mm-num').value=m.numero||'';
     if(m.photo){
       document.getElementById('membre-photo-data').value=m.photo;
       document.getElementById('membre-photo-preview').style.background='none';
@@ -2276,7 +2354,7 @@ function ouvrirModalMembre(id){
     }
     if(m.statut==='Sortant') document.getElementById('sortie-section').style.display='block';
   } else {
-    document.getElementById('mm-numero').value=genNumMembre();
+    document.getElementById('mm-num').value=genNumMembre();
     document.getElementById('mm-adhesion').value=new Date().toISOString().split('T')[0];
   }
   document.getElementById('mm-statut').onchange=function(){
@@ -2295,11 +2373,11 @@ function saveMembre(){
     type:document.getElementById('mm-type').value,
     cotis:document.getElementById('mm-cotis').value,
     statut:document.getElementById('mm-statut').value,
-    numero:v('mm-numero')||genNumMembre(),
+    numero:v('mm-num')||genNumMembre(),
     formation:v('mm-formation'),competences:v('mm-competences'),
     photo:document.getElementById('membre-photo-data').value||null,
     dateSortie:v('mm-date-sortie'),
-    motifSortie:document.getElementById('mm-motif-sortie')?document.getElementById('mm-motif-sortie').value:'',
+    motifSortie:'',
     obsSortie:v('mm-obs-sortie')};
   if(membreEnEdition){Object.assign(membreEnEdition,data);}
   else{data.id='m'+Date.now();DB.membres.push(data);}
@@ -3479,8 +3557,8 @@ function showFinTab(tab, el){
 function onFinTypeChange(){
   const isSortie = document.getElementById('mf-type').value === 'sortie';
   const warn = document.getElementById('m-fin-warning');
-  const approInfo = document.getElementById('mf-approbation-info');
-  const btnSubmit = document.getElementById('btn-submit-fin');
+  const approInfo = document.getElementById('approbation-info');
+  const btnSubmit = document.getElementById('mf-btn-submit');
   if(warn) warn.style.display = isSortie ? 'block' : 'none';
   if(approInfo) approInfo.style.display = (isSortie && isAdmin()) ? 'block' : 'none';
   if(btnSubmit) btnSubmit.textContent = isSortie && !isAdmin() ? '📤 Soumettre pour validation' : 'Enregistrer';
