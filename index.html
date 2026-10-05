@@ -165,6 +165,7 @@ tr:hover td{background:var(--vert-pale)}
 }
 @media(max-width:400px){.sg{grid-template-columns:1fr}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -259,8 +260,8 @@ tr:hover td{background:var(--vert-pale)}
             <option value="Sortant">Sortants</option>
             <option value="Suspendu">Suspendus</option>
           </select>
-          <button class="btn btn-o btn-sm" onclick="exportMembres()">📥 Exporter CSV</button>
-          <label class="btn btn-o btn-sm" style="cursor:pointer">📤 Importer<input type="file" accept=".csv" style="display:none" onchange="importMembres(this)"></label>
+          <button class="btn btn-o btn-sm" onclick="telechargerModeleMembres()">📋 Modèle Excel</button>
+          <label class="btn btn-o btn-sm" style="cursor:pointer">📤 Importer Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importMembresExcel(this)"></label>
           <button class="btn btn-p" id="btn-add-membre" style="display:none" onclick="ouvrirModalMembre()">+ Ajouter</button>
         </div>
         <!-- Tableau -->
@@ -427,8 +428,8 @@ tr:hover td{background:var(--vert-pale)}
             <option value="Jeune">Jeunes (16–30)</option>
             <option value="Femme">Femmes</option>
           </select>
-          <button class="btn btn-o btn-sm" onclick="exportBenef()">📥 CSV</button>
-          <label class="btn btn-o btn-sm" style="cursor:pointer">📤 Import<input type="file" accept=".csv" style="display:none" onchange="importBenef(this)"></label>
+          <button class="btn btn-o btn-sm" onclick="telechargerModeleBenef()">📋 Modèle Excel</button>
+          <label class="btn btn-o btn-sm" style="cursor:pointer">📤 Importer Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importBenefExcel(this)"></label>
           <button class="btn btn-p" id="btn-add-benef" style="display:none" onclick="openM('m-benef')">+ Ajouter</button>
         </div>
         <!-- Stats -->
@@ -1883,7 +1884,7 @@ function genererCarte(userId){
   const u=DB.users.find(x=>x.id===userId);
   if(!u){alert('Utilisateur introuvable.');return;}
   // Dimensions carte
-  const W=700,H=400;
+  const W=700,H=380;
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const ctx=cv.getContext('2d');
 
@@ -1942,17 +1943,16 @@ function genererCarte(userId){
   ctx.strokeStyle='#e2e8e4';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(mx+140,my+44+105);ctx.lineTo(mx+mw-20,my+44+105);ctx.stroke();
 
-  // Infos
-  const infoY=my+44+130;
+  // Infos (sans ligne Accès)
+  const infoY=my+44+125;
   const fields=[
     ['📧  Email',u.email||'—'],
     ['🔑  Mot de passe',u.pwd||'—'],
-    ['🛡  Accès',u.role==='responsable'?(u.volet||'—'):'Tous les volets'],
     ['✅  Statut',u.actif?'Compte actif':'Compte inactif']
   ];
   ctx.textAlign='left';
   fields.forEach(([lbl,val],idx)=>{
-    const y=infoY+idx*30;
+    const y=infoY+idx*36;
     ctx.fillStyle='#4a5a4f';ctx.font='12px Segoe UI, sans-serif';
     ctx.fillText(lbl,tx,y);
     ctx.fillStyle='#1a2420';ctx.font='bold 13px Segoe UI, sans-serif';
@@ -2633,20 +2633,56 @@ function exportMembres(){
   dlCSV('Membres_FNG_'+new Date().toISOString().slice(0,10)+'.csv',h,r);
 }
 
-function importMembres(input){
+// ── MODÈLE EXCEL MEMBRES ──
+function telechargerModeleMembres(){
+  if(typeof XLSX==='undefined'){alert('Bibliothèque Excel non chargée, vérifiez votre connexion.');return;}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['Numéro','Prénom*','Nom*','Rôle','Téléphone','Email','Quartier','Date adhésion (AAAA-MM-JJ)','Type adhésion','Cotisation','Statut','Formation/Niveau'],
+    ['FNG-M-001','Mamadou','Diallo','Membre','622000001','mamadou@email.com','Abattoir','2025-01-15','Adhérent actif','À jour','Actif','Licence']
+  ]);
+  ws['!cols']=[{wch:14},{wch:14},{wch:14},{wch:16},{wch:14},{wch:22},{wch:14},{wch:22},{wch:18},{wch:12},{wch:10},{wch:18}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Membres');
+  XLSX.writeFile(wb,'modele_membres_FNG.xlsx');
+}
+
+async function importMembresExcel(input){
+  if(typeof XLSX==='undefined'){alert('Bibliothèque Excel non chargée.');return;}
   const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    let n=0;
-    e.target.result.split('\n').slice(1).forEach(line=>{
-      const c=line.split(',').map(x=>x.replace(/^"|"$/g,'').trim());
-      if(c.length<3||!c[1])return;
-      DB.membres.push({id:'m'+Date.now()+Math.random(),numero:c[0]||genNumMembre(),prenom:c[1],nom:c[2],role:c[3]||'Membre',tel:c[4]||'',email:c[5]||'',quartier:c[6]||'',adhesion:c[7]||'',type:c[8]||'Adhérent actif',cotis:c[9]||'À jour',statut:c[10]||'Actif',formation:c[11]||''});
-      n++;
-    });
-    input.value='';renderMembres();alert(`✅ ${n} membre(s) importé(s).`);
-  };
-  reader.readAsText(file);
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  if(!rows.length){alert('Fichier vide ou format incorrect.');input.value='';return;}
+  let n=0,errs=[];
+  for(const r of rows){
+    const prenom=(r['Prénom*']||r['Prenom*']||r['prenom']||'').toString().trim();
+    const nom=(r['Nom*']||r['nom']||'').toString().trim();
+    if(!prenom){errs.push(`Ligne ignorée — prénom manquant`);continue;}
+    if(DB.membres.find(m=>m.prenom.toLowerCase()===prenom.toLowerCase()&&m.nom.toLowerCase()===nom.toLowerCase())){
+      errs.push(`${prenom} ${nom} déjà présent — ignoré`);continue;
+    }
+    const membre={
+      id:'m'+Date.now()+Math.random(),
+      numero:(r['Numéro']||r['Numero']||'').toString().trim()||genNumMembre(),
+      prenom,nom,
+      role:(r['Rôle']||r['Role']||'Membre').toString().trim(),
+      tel:(r['Téléphone']||r['Telephone']||'').toString().trim(),
+      email:(r['Email']||'').toString().trim(),
+      quartier:(r['Quartier']||'').toString().trim(),
+      adhesion:(r['Date adhésion (AAAA-MM-JJ)']||'').toString().trim(),
+      type_adhesion:(r['Type adhésion']||'Adhérent actif').toString().trim(),
+      cotis:(r['Cotisation']||'À jour').toString().trim(),
+      statut:(r['Statut']||'Actif').toString().trim(),
+      formation:(r['Formation/Niveau']||'').toString().trim()
+    };
+    const res=await sbInsert('membres',membre);
+    if(res&&res[0]){DB.membres.push(res[0]);}else{DB.membres.push(membre);}
+    n++;
+  }
+  input.value='';renderMembres();
+  let msg=`✅ ${n} membre(s) importé(s).`;
+  if(errs.length)msg+='\n\n⚠️ '+errs.join('\n');
+  alert(msg);
 }
 
 function ouvrirModalBenef(id){
@@ -2734,20 +2770,58 @@ function exportBenef(){
   dlCSV('Beneficiaires_FNG_'+new Date().toISOString().slice(0,10)+'.csv',h,r);
 }
 
-function importBenef(input){
-  const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
+// ── MODÈLE EXCEL BÉNÉFICIAIRES ──
+function telechargerModeleBenef(){
+  if(typeof XLSX==='undefined'){alert('Bibliothèque Excel non chargée, vérifiez votre connexion.');return;}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['Numéro','Prénom*','Nom','Sexe (M/F)','Date naissance (AAAA-MM-JJ)','Catégorie*','Programme*','Quartier','École/Établissement','Date inscription (AAAA-MM-JJ)','Statut','Nom tuteur','Tél tuteur','Lien tuteur','Vulnérabilité','Besoins','Notes'],
+    ['FNG-B-001','Fatoumata','Diallo','F','2010-05-12','Enfant','Soutien scolaire','Abattoir','École A. Diallo','2025-02-01','Actif','Mamadou Diallo','622000001','Père','','Fournitures scolaires','']
+  ]);
+  ws['!cols']=[{wch:13},{wch:14},{wch:14},{wch:12},{wch:24},{wch:14},{wch:20},{wch:12},{wch:20},{wch:24},{wch:10},{wch:16},{wch:14},{wch:14},{wch:14},{wch:18},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Bénéficiaires');
+  XLSX.writeFile(wb,'modele_beneficiaires_FNG.xlsx');
+}
 
-    e.target.result.split('\n').slice(1).forEach(line=>{
-      const c=line.split(',').map(x=>x.replace(/^"|"$/g,'').trim());
-      if(c.length<3||!c[1])return;
-      DB.beneficiaires.push({id:'b'+Date.now()+Math.random(),numero:c[0]||genNumBenef(),prenom:c[1],nom:c[2],sexe:c[3]||'M',ddn:c[4]||'',cat:c[5]||'',programme:c[6]||'',quartier:c[7]||'',ecole:c[8]||'',dateinscription:c[9]||'',statut:c[10]||'Actif',tuteurnom:c[11]||'',tuteurtel:c[12]||''});
-      n++;
-    });
-    input.value='';renderBenef();alert(`✅ ${n} bénéficiaire(s) importé(s).`);
-  };
-  reader.readAsText(file);
+async function importBenefExcel(input){
+  if(typeof XLSX==='undefined'){alert('Bibliothèque Excel non chargée.');return;}
+  const file=input.files[0];if(!file)return;
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  if(!rows.length){alert('Fichier vide ou format incorrect.');input.value='';return;}
+  let n=0,errs=[];
+  for(const r of rows){
+    const prenom=(r['Prénom*']||r['Prenom*']||r['prenom']||'').toString().trim();
+    if(!prenom){errs.push('Ligne ignorée — prénom manquant');continue;}
+    const benef={
+      id:'b'+Date.now()+Math.random(),
+      numero:(r['Numéro']||r['Numero']||'').toString().trim()||genNumBenef(),
+      prenom,
+      nom:(r['Nom']||'').toString().trim(),
+      sexe:(r['Sexe (M/F)']||'M').toString().trim(),
+      ddn:(r['Date naissance (AAAA-MM-JJ)']||'').toString().trim(),
+      cat:(r['Catégorie*']||r['Categorie*']||'').toString().trim(),
+      programme:(r['Programme*']||'').toString().trim(),
+      quartier:(r['Quartier']||'').toString().trim(),
+      ecole:(r['École/Établissement']||r['Ecole/Etablissement']||'').toString().trim(),
+      dateinscription:(r['Date inscription (AAAA-MM-JJ)']||'').toString().trim(),
+      statut:(r['Statut']||'Actif').toString().trim(),
+      tuteurnom:(r['Nom tuteur']||'').toString().trim(),
+      tuteurtel:(r['Tél tuteur']||r['Tel tuteur']||'').toString().trim(),
+      lien:(r['Lien tuteur']||'').toString().trim(),
+      vulnerabilite:(r['Vulnérabilité']||r['Vulnerabilite']||'').toString().trim(),
+      besoins:(r['Besoins']||'').toString().trim(),
+      notes:(r['Notes']||'').toString().trim()
+    };
+    const res=await sbInsert('beneficiaires',benef);
+    if(res&&res[0]){DB.beneficiaires.push(res[0]);}else{DB.beneficiaires.push(benef);}
+    n++;
+  }
+  input.value='';renderBenef();
+  let msg=`✅ ${n} bénéficiaire(s) importé(s).`;
+  if(errs.length)msg+='\n\n⚠️ '+errs.join('\n');
+  alert(msg);
 }
 
 function genNumBenef(){
