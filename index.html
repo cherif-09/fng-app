@@ -1392,7 +1392,7 @@ async function loadAllData() {
   DB.activites = activites || [];
   DB.beneficiaires = beneficiaires || [];
   DB.users = users || [];
-  DB.messages = messages || [];
+  DB.messages = (messages||[]).map(supaToMsg);
   // Rafraîchir currentUser avec les données à jour (acces_volets inclus)
   if(currentUser) {
     const fresh = DB.users.find(u=>u.id===currentUser.id);
@@ -1547,7 +1547,8 @@ function showPage(id) {
   if(id==='documents') renderDocuments();
   if(id==='notifications') renderNotifications();
   if(id==='comptes') renderComptes();
-  if(id==='forum') renderForum();
+  if(id==='forum'){renderForum();startPolling();}
+  else stopPolling();
 }
 
 
@@ -3509,6 +3510,65 @@ function formatMsgDate(iso){
   return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 }
 
+// Convertit un objet message JS (camelCase) → ligne Supabase (snake_case)
+function msgToSupa(m){
+  return {
+    id: m.id,
+    type: m.type||'texte',
+    texte: m.texte||null,
+    image: m.image||null,
+    audio: m.audio||null,
+    date: m.date,
+    auteur_id: m.auteurId||null,
+    auteur_nom: m.auteurNom||null,
+    conv_id: m.convId||null,
+    repondre_a: m.repondreA||null,
+    repondre_a_texte: m.repondreATexte||null,
+    modifie: m.modifie||false
+  };
+}
+// Convertit une ligne Supabase → objet JS
+function supaToMsg(r){
+  return {
+    id: r.id,
+    type: r.type||'texte',
+    texte: r.texte||'',
+    image: r.image||null,
+    audio: r.audio||null,
+    date: r.date,
+    auteurId: r.auteur_id,
+    auteurNom: r.auteur_nom,
+    convId: r.conv_id||null,
+    repondreA: r.repondre_a||null,
+    repondreATexte: r.repondre_a_texte||null,
+    modifie: r.modifie||false
+  };
+}
+
+// Polling temps réel toutes les 3 secondes
+let pollingInterval=null;
+function startPolling(){
+  if(pollingInterval) clearInterval(pollingInterval);
+  pollingInterval=setInterval(async()=>{
+    try{
+      const rows=await sbGet('messages','order=date.asc');
+      if(!rows||!Array.isArray(rows))return;
+      const newMsgs=rows.map(supaToMsg);
+      // Vérifier s'il y a de nouveaux messages avant de re-render
+      if(newMsgs.length!==DB.messages.length||
+         (newMsgs.length>0&&newMsgs[newMsgs.length-1].id!==DB.messages[DB.messages.length-1]?.id)){
+        const zone=document.getElementById('chat-messages');
+        const wasAtBottom=zone&&(zone.scrollHeight-zone.scrollTop-zone.clientHeight<60);
+        DB.messages=newMsgs;
+        renderMessages();
+        if(wasAtBottom&&zone) zone.scrollTop=zone.scrollHeight;
+        if(convActive) renderMessagesPrives(convActive);
+      }
+    }catch(e){}
+  },3000);
+}
+function stopPolling(){ if(pollingInterval){clearInterval(pollingInterval);pollingInterval=null;} }
+
 async function envoyerMessage(){
   const input=document.getElementById('msg-input');
   const texte=(input.value||'').trim();
@@ -3519,7 +3579,8 @@ async function envoyerMessage(){
     repondreATexte:repondreA?(repondreA.texte||'Image').slice(0,60):null};
   DB.messages.push(msg);
   input.value='';annulerReponse();renderMessages();
-  await sbInsert('messages', msg).catch(()=>{});
+  const res=await sbInsert('messages', msgToSupa(msg)).catch(()=>null);
+  if(!res) console.warn('[Forum] Message non sauvegardé en base');
 }
 
 async function envoyerImage(input, contexte){
@@ -3542,7 +3603,7 @@ async function envoyerImage(input, contexte){
       } else {
         DB.messages.push(msg);renderMessages();
       }
-      await sbInsert('messages', msg).catch(()=>{});
+      await sbInsert('messages', msgToSupa(msg)).catch(()=>{});
     };
     img.src=e.target.result;
   };
@@ -3588,7 +3649,7 @@ async function toggleVocal(){
           date:new Date().toISOString(),auteurId:currentUser.id,auteurNom:currentUser.prenom+' '+currentUser.nom,
           repondreA:repondreA?repondreA.id:null,repondreATexte:repondreA?(repondreA.texte||'Message').slice(0,40):null};
         DB.messages.push(msg);annulerReponse();renderMessages();
-        await sbInsert('messages',msg).catch(()=>{});
+        await sbInsert('messages',msgToSupa(msg)).catch(()=>{});
       };
       mediaRecorder.start();
       enregistrement=true;
@@ -3758,7 +3819,7 @@ function renderMessagesPrives(convId){
   zone.scrollTop=zone.scrollHeight;
 }
 
-function envoyerMessagePrive(){
+async function envoyerMessagePrive(){
   if(!convActive)return;
   const input=document.getElementById('prive-input');
   const texte=(input.value||'').trim();if(!texte)return;
@@ -3766,7 +3827,6 @@ function envoyerMessagePrive(){
   const msg={id:'msg'+Date.now(),type:'texte',texte,date:new Date().toISOString(),
     auteurId:currentUser.id,auteurNom:currentUser.prenom+' '+currentUser.nom,convId:convActive};
   DB.messages.push(msg);
-  // Marquer non lu pour les autres
   conv.participants.filter(uid=>uid!==currentUser.id).forEach(uid=>{
     conv.nonLus=conv.nonLus||{};
     conv.nonLus[uid]=(conv.nonLus[uid]||0)+1;
@@ -3774,6 +3834,7 @@ function envoyerMessagePrive(){
   input.value='';
   renderMessagesPrives(convActive);
   renderConversations();
+  await sbInsert('messages', msgToSupa(msg)).catch(()=>{});
 }
 
 function mettreAJourBadgePrives(){
