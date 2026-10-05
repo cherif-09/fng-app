@@ -158,12 +158,33 @@ tr:hover td{background:var(--vert-pale)}
 .ovbg.open{display:block}
 
 @media(max-width:768px){
-  .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
-  .main{margin-left:0;height:auto;overflow-y:visible}.menu-btn{display:block}.content{padding:14px}
+  .sidebar{transform:translateX(-100%);z-index:200}.sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}.menu-btn{display:block}
+  .content{padding:12px}
   .sg{grid-template-columns:1fr 1fr}.two,.three{grid-template-columns:1fr}
-  .fg2{grid-template-columns:1fr}.topbar{padding:11px 14px}
+  .fg2{grid-template-columns:1fr}.topbar{padding:10px 14px}
+  /* Zones tactiles confortables */
+  .btn{padding:10px 16px;min-height:42px}
+  .btn-sm{padding:8px 13px;min-height:38px;font-size:13px}
+  .btn-xs{padding:7px 11px;min-height:34px;font-size:12px}
+  .ni{padding:14px 20px;font-size:14px}
+  /* Tableaux scrollables */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:500px}
+  /* Modales adaptées mobile */
+  .modal-box{width:96vw;max-width:96vw;max-height:90vh;overflow-y:auto;margin:5vh auto}
+  /* Login box */
+  .login-box{padding:28px 20px}
+  .sc .vl{font-size:26px}
+  /* Toolbar actions en colonne */
+  .ch{flex-wrap:wrap;gap:8px}
+  .ch>div{display:flex;flex-wrap:wrap;gap:6px}
 }
-@media(max-width:400px){.sg{grid-template-columns:1fr}}
+@media(max-width:420px){
+  .sg{grid-template-columns:1fr}
+  .topbar .pt{font-size:14px}
+  .content{padding:10px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
