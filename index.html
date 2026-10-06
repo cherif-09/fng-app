@@ -170,86 +170,100 @@ tr:hover td{background:var(--vert-pale)}
 .bottom-nav{display:none}
 
 @media(max-width:768px){
-  /* Empêche le débordement horizontal */
-  html,body{overflow-x:hidden;max-width:100vw}
+  /* ── Base : zéro débordement horizontal ── */
+  html,body{overflow-x:hidden;width:100%;max-width:100vw}
+  *{max-width:100%;word-break:break-word}
 
-  /* Sidebar masquée — on n'utilise plus le hamburger */
+  /* ── Sidebar & topbar ── */
   .sidebar{transform:translateX(-100%);z-index:200}.sidebar.open{transform:translateX(0)}
-  .main{margin-left:0}.menu-btn{display:block}
+  .main{margin-left:0;overflow-x:hidden}
+  .menu-btn{display:block}
+  .topbar{padding:10px 14px}
 
-  /* Contenu principal avec espace pour la bottom nav */
-  .main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
-  .content{padding:12px}
-  .sg{grid-template-columns:1fr 1fr}.two,.three{grid-template-columns:1fr}
-  .fg2{grid-template-columns:1fr}.topbar{padding:10px 14px}
+  /* ── Espace pour la bottom nav ── */
+  .main{padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+  .content{padding:10px 12px}
 
-  /* Zones tactiles confortables */
-  .btn{padding:10px 16px;min-height:44px}
-  .btn-sm{padding:8px 13px;min-height:38px;font-size:13px}
-  .btn-xs{padding:7px 11px;min-height:34px;font-size:12px}
+  /* ── Grilles → colonne unique ── */
+  .sg{grid-template-columns:1fr 1fr}
+  .two,.three{grid-template-columns:1fr}
+  .fg2{grid-template-columns:1fr}
 
-  /* Tableaux scrollables */
-  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:480px}
+  /* ── Tableaux : vue "carte" sur mobile ── */
+  /* Le wrapper scroll reste pour les tables larges en portrait */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%}
+  /* Supprimer le min-width rigide des tables */
+  table{min-width:0;width:100%}
+  /* Cacher les colonnes peu importantes sur mobile */
+  .hide-mobile{display:none!important}
+  /* Cellules plus compactes */
+  th{padding:7px 10px;font-size:10px}
+  td{padding:9px 10px;font-size:12px}
 
-  /* Modales adaptées mobile — remontent depuis le bas */
-  .mo{align-items:flex-end;padding:0}
-  .mb{border-radius:18px 18px 0 0;width:100%;max-width:100%;max-height:92vh;margin:0}
+  /* ── Boutons & zones tactiles ── */
+  .btn{padding:10px 14px;min-height:44px;font-size:13px}
+  .btn-sm{padding:8px 12px;min-height:40px;font-size:12px}
+  .btn-xs{padding:6px 10px;min-height:34px;font-size:11px}
 
-  /* Login box */
-  .login-box{padding:28px 20px}
-  .sc .vl{font-size:26px}
-
-  /* Toolbar */
-  .ch{flex-wrap:wrap;gap:8px}
+  /* ── Toolbars ── */
+  .ch{flex-wrap:wrap;gap:8px;padding:10px 14px}
   .ch>div{display:flex;flex-wrap:wrap;gap:6px}
+  .sbr{flex-wrap:wrap;gap:8px}
+  .sr{min-width:0;width:100%}
 
-  /* ── BOTTOM NAV BAR ── */
+  /* ── Modales : sheet depuis le bas ── */
+  .mo{align-items:flex-end;padding:0}
+  .mb{border-radius:16px 16px 0 0;width:100%;max-width:100%;max-height:88vh;margin:0}
+  .mf{padding:12px 16px;flex-wrap:wrap;gap:8px}
+  .mf .btn{flex:1;min-width:120px;justify-content:center}
+
+  /* ── Login ── */
+  .login-box{padding:24px 18px}
+  .sc .vl{font-size:24px}
+
+  /* ── Forum chat ── */
+  #chat-messages{font-size:13px}
+
+  /* ── Stat cards ── */
+  .sc{padding:14px}
+
+  /* ── Masquer notif btn topbar (dans bottom nav) ── */
+  .notif-btn{display:none}
+
+  /* ══ BOTTOM NAV BAR ══ */
   .bottom-nav{
     display:flex;
     position:fixed;
     bottom:0;left:0;right:0;
-    height:calc(60px + env(safe-area-inset-bottom,0px));
+    height:calc(58px + env(safe-area-inset-bottom,0px));
     padding-bottom:env(safe-area-inset-bottom,0px);
     background:white;
-    border-top:1px solid var(--gris-leg);
+    border-top:1.5px solid var(--gris-leg);
     z-index:150;
-    box-shadow:0 -2px 16px rgba(0,0,0,.08);
+    box-shadow:0 -2px 20px rgba(0,0,0,.10);
   }
   .bn-item{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:3px;
-    cursor:pointer;
-    padding:8px 4px;
-    font-size:10px;
-    font-weight:600;
-    color:var(--gris-txt);
-    transition:color .15s;
-    position:relative;
-    border:none;
-    background:none;
-    -webkit-tap-highlight-color:transparent;
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;cursor:pointer;padding:6px 2px;
+    color:var(--gris-txt);transition:color .15s;
+    position:relative;border:none;background:none;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
   }
-  .bn-item .bn-icon{font-size:20px;line-height:1}
-  .bn-item .bn-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;text-align:center}
+  .bn-item .bn-icon{font-size:22px;line-height:1;transition:transform .15s}
+  .bn-item .bn-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56px;text-align:center}
   .bn-item.active{color:var(--vert)}
-  .bn-item.active .bn-icon{transform:scale(1.1)}
-  .bn-dot{position:absolute;top:6px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--rouge);display:none;border:2px solid white}
-  .bn-more{position:relative}
-
-  /* Topbar : cacher le bouton notif dans la topbar sur mobile (il est dans la bottom nav) */
-  .notif-btn{display:none}
+  .bn-item.active .bn-icon{transform:scale(1.15)}
+  .bn-dot{position:absolute;top:5px;right:calc(50% - 16px);width:9px;height:9px;
+    border-radius:50%;background:var(--rouge);display:none;border:2px solid white}
 }
 
 @media(max-width:420px){
   .sg{grid-template-columns:1fr}
   .topbar .pt{font-size:14px}
-  .content{padding:10px}
-  .bn-item .bn-label{font-size:8px;max-width:44px}
+  .content{padding:8px 10px}
+  .bn-item .bn-label{font-size:8px;max-width:46px}
+  .btn{font-size:12px;padding:9px 10px}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -379,8 +393,8 @@ tr:hover td{background:var(--vert-pale)}
           </div>
           <div class="tw"><table id="tbl-membres">
             <thead><tr>
-              <th>Photo</th><th>Nom complet</th><th>Rôle</th><th>Contact</th>
-              <th>Adhésion</th><th>Cotisation</th><th>Statut</th>
+              <th class="hide-mobile">Photo</th><th>Nom complet</th><th>Rôle</th><th class="hide-mobile">Contact</th>
+              <th class="hide-mobile">Adhésion</th><th>Cotisation</th><th>Statut</th>
               <th id="th-m-actions">Actions</th>
             </tr></thead>
             <tbody id="tbody-membres"></tbody>
@@ -431,7 +445,7 @@ tr:hover td{background:var(--vert-pale)}
           </div>
           <div class="card">
             <div class="ch"><div class="ct">Journal comptable</div><span id="fin-journal-cnt" style="font-size:12px;color:var(--gris-txt)"></span></div>
-            <div class="tw"><table><thead><tr><th>N° Pièce</th><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Type</th><th>Montant GNF</th><th>Statut</th><th>Pièce justif.</th><th></th></tr></thead>
+            <div class="tw"><table><thead><tr><th class="hide-mobile">N° Pièce</th><th>Date</th><th>Libellé</th><th class="hide-mobile">Catégorie</th><th>Type</th><th>Montant GNF</th><th>Statut</th><th class="hide-mobile">Pièce justif.</th><th></th></tr></thead>
             <tbody id="tbody-journal"></tbody></table></div>
           </div>
         </div>
@@ -483,7 +497,7 @@ tr:hover td{background:var(--vert-pale)}
             <button class="btn btn-o btn-sm" onclick="exportAuditPDF()">📄 PDF</button>
           </div>
           <div class="card"><div class="ch"><div class="ct">Journal d'audit</div></div>
-            <div class="tw"><table><thead><tr><th>N° Pièce</th><th>Date</th><th>Type</th><th>Libellé</th><th>Débit GNF</th><th>Crédit GNF</th><th>Solde cumulé</th><th>Enregistré par</th><th>Statut</th></tr></thead>
+            <div class="tw"><table><thead><tr><th class="hide-mobile">N° Pièce</th><th>Date</th><th class="hide-mobile">Type</th><th>Libellé</th><th>Débit GNF</th><th>Crédit GNF</th><th class="hide-mobile">Solde cumulé</th><th class="hide-mobile">Enregistré par</th><th>Statut</th></tr></thead>
             <tbody id="tbody-audit"></tbody></table></div>
           </div>
         </div>
@@ -552,7 +566,7 @@ tr:hover td{background:var(--vert-pale)}
             <button class="btn btn-o btn-sm" id="btn-badges-benef" onclick="ouvrirBadgesBenef()">🪪 Badges</button>
           </div>
           <div class="tw"><table id="tbl-benef">
-            <thead><tr><th>Photo</th><th>Nom</th><th>Âge</th><th>Catégorie</th><th>Programme</th><th>École</th><th>Tuteur</th><th>Quartier</th><th>Statut</th><th>Actions</th></tr></thead>
+            <thead><tr><th class="hide-mobile">Photo</th><th>Nom</th><th class="hide-mobile">Âge</th><th>Catégorie</th><th class="hide-mobile">Programme</th><th class="hide-mobile">École</th><th class="hide-mobile">Tuteur</th><th class="hide-mobile">Quartier</th><th>Statut</th><th>Actions</th></tr></thead>
             <tbody id="tbody-benef"></tbody>
           </table></div>
         </div>
@@ -1768,16 +1782,16 @@ function renderMembres(){
   }
   tbody.innerHTML=liste.map((m,i)=>`
     <tr data-statut="${m.statut||'Actif'}">
-      <td><div style="width:38px;height:38px;border-radius:50%;overflow:hidden;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid var(--vert)">
+      <td class="hide-mobile"><div style="width:38px;height:38px;border-radius:50%;overflow:hidden;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid var(--vert)">
         ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover">`:'👤'}</div></td>
       <td><strong>${m.prenom} ${m.nom||''}</strong><br>
         <span style="font-size:11px;color:var(--gt)">${m.numero||''}</span></td>
       <td style="font-size:12px">${m.role||'—'}</td>
-      <td style="font-size:12px">${m.tel||'—'}</td>
-      <td style="font-size:12px">${m.adhesion||'—'}</td>
+      <td class="hide-mobile" style="font-size:12px">${m.tel||'—'}</td>
+      <td class="hide-mobile" style="font-size:12px">${m.adhesion||'—'}</td>
       <td><span class="bg ${m.cotis==='À jour'?'bg-g':m.cotis==='En retard'?'bg-r':'bg-gr'}">${m.cotis||'—'}</span></td>
       <td><span class="bg ${m.statut==='Actif'?'bg-g':m.statut==='Sortant'?'bg-r':'bg-o'}">${m.statut||'Actif'}</span></td>
-      <td style="font-size:11px;color:var(--gt);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.formation||'—'}</td>
+      <td class="hide-mobile" style="font-size:11px;color:var(--gt);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.formation||'—'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-o btn-xs" onclick="voirDetailMembre('${m.id||i}')">👁</button>
         ${canEdit?`<button class="btn btn-o btn-xs" onclick="ouvrirModalMembre('${m.id||i}')">✏️</button>
@@ -1912,14 +1926,14 @@ function renderBenef(){
   }
   tbody.innerHTML=DB.beneficiaires.map((b,i)=>`
     <tr data-prog="${b.programme||''}" data-cat="${b.cat||''}">
-      <td><div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:16px">
+      <td class="hide-mobile"><div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:16px">
         ${b.photo?`<img src="${b.photo}" style="width:100%;height:100%;object-fit:cover">`:'👤'}</div></td>
       <td><strong>${b.prenom} ${b.nom||''}</strong><br><span style="font-size:11px;color:var(--gt)">${b.numero||''}</span></td>
-      <td>${b.age||'—'} ans<br><span style="font-size:11px;color:var(--gt)">${b.sexe==='F'?'Fille':'Garçon'}</span></td>
-      <td><span class="bg bg-b" style="font-size:10px">${b.cat||'—'}</span><br><span style="font-size:11px;color:var(--gt)">${b.programme||'—'}</span></td>
-      <td style="font-size:12px">${b.ecole||'—'}<br><span style="font-size:11px;color:var(--gt)">${b.niveau||''}</span></td>
-      <td style="font-size:12px">${b.tuteurnom||'—'}<br><span style="font-size:11px;color:var(--gt)">${b.tuteurtel||''}</span></td>
-      <td>${b.quartier||'—'}</td>
+      <td class="hide-mobile">${b.age||'—'} ans<br><span style="font-size:11px;color:var(--gt)">${b.sexe==='F'?'Fille':'Garçon'}</span></td>
+      <td><span class="bg bg-b" style="font-size:10px">${b.cat||'—'}</span></td>
+      <td class="hide-mobile" style="font-size:12px">${b.ecole||'—'}<br><span style="font-size:11px;color:var(--gt)">${b.niveau||''}</span></td>
+      <td class="hide-mobile" style="font-size:12px">${b.tuteurnom||'—'}<br><span style="font-size:11px;color:var(--gt)">${b.tuteurtel||''}</span></td>
+      <td class="hide-mobile">${b.quartier||'—'}</td>
       <td><span class="bg ${b.statut==='Actif'?'bg-g':b.statut==='Suspendu'?'bg-o':'bg-r'}">${b.statut||'Actif'}</span></td>
       <td style="white-space:nowrap">
         <button class="btn btn-o btn-xs" onclick="ouvrirModalBenef('${b.id}')">✏️</button>
@@ -4446,16 +4460,16 @@ function renderJournal(){
   tbody.innerHTML=data.map(t=>{
     const canValid=isAdmin()&&t.statut==='en attente';
     return `<tr>
-      <td style="font-size:11px;color:var(--gris-txt)">${t.numPiece||'—'}</td>
+      <td class="hide-mobile" style="font-size:11px;color:var(--gris-txt)">${t.numPiece||'—'}</td>
       <td style="font-size:12px">${t.date}</td>
       <td style="font-size:12px;max-width:180px"><strong>${t.description||t.desc||''}</strong>${t.beneficiaire||t.benef?`<br><span style="font-size:11px;color:var(--gris-txt)">${t.beneficiaire||t.benef}</span>`:''}</td>
-      <td><span class="bg bg-gr" style="font-size:10px">${t.categorie||t.cat||'—'}</span></td>
+      <td class="hide-mobile"><span class="bg bg-gr" style="font-size:10px">${t.categorie||t.cat||'—'}</span></td>
       <td><span class="bg ${t.type==='entrée'?'bg-g':'bg-r'}" style="font-size:10px">${t.type}</span></td>
       <td style="font-weight:700;color:${t.type==='entrée'?'var(--vert2)':'var(--rouge)'}">
         ${t.type==='entrée'?'+':'-'}${t.montant.toLocaleString()}
       </td>
       <td><span class="bg ${t.statut==='validé'||t.statut==='approuvé'?'bg-g':t.statut==='en attente'?'bg-o':'bg-r'}" style="font-size:10px">${t.statut}</span></td>
-      <td style="font-size:11px;color:var(--gris-txt)">${t.piece||'—'}</td>
+      <td class="hide-mobile" style="font-size:11px;color:var(--gris-txt)">${t.piece||'—'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-o btn-xs" onclick="voirDetailTransaction('${t.id}')">👁</button>
         ${canValid?`<button class="btn btn-p btn-xs" onclick="ouvrirValiderDepense('${t.id}')">✅</button>`:''}
@@ -4624,14 +4638,14 @@ function renderAudit(){
     const isValide=t.statut==='validé'||t.statut==='approuvé';
     if(isValide){if(t.type==='entrée')solde+=t.montant;else solde-=t.montant;}
     return `<tr>
-      <td style="font-size:11px;font-weight:700;color:var(--vert)">${t.numPiece||'—'}</td>
+      <td class="hide-mobile" style="font-size:11px;font-weight:700;color:var(--vert)">${t.numPiece||'—'}</td>
       <td style="font-size:12px">${t.date}</td>
-      <td><span class="bg ${t.type==='entrée'?'bg-g':'bg-r'}" style="font-size:10px">${t.type}</span></td>
+      <td class="hide-mobile"><span class="bg ${t.type==='entrée'?'bg-g':'bg-r'}" style="font-size:10px">${t.type}</span></td>
       <td style="font-size:12px;max-width:160px">${t.description||t.desc||''}</td>
       <td style="color:var(--vert2);font-weight:${t.type==='entrée'?700:400}">${t.type==='entrée'?t.montant.toLocaleString():'—'}</td>
       <td style="color:var(--rouge);font-weight:${t.type==='sortie'?700:400}">${t.type==='sortie'?t.montant.toLocaleString():'—'}</td>
-      <td style="font-weight:700;color:${solde>=0?'var(--vert)':'var(--rouge)'}">${isValide?solde.toLocaleString():'—'}</td>
-      <td style="font-size:11px;color:var(--gris-txt)">${t.enregistrePar||'—'}</td>
+      <td class="hide-mobile" style="font-weight:700;color:${solde>=0?'var(--vert)':'var(--rouge)'}">${isValide?solde.toLocaleString():'—'}</td>
+      <td class="hide-mobile" style="font-size:11px;color:var(--gris-txt)">${t.enregistrePar||'—'}</td>
       <td><span class="bg ${t.statut==='validé'||t.statut==='approuvé'?'bg-g':t.statut==='en attente'?'bg-o':'bg-r'}" style="font-size:10px">${t.statut}</span></td>
     </tr>`;
   }).join('');
