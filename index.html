@@ -2,8 +2,17 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FNG — Fria Nouvelle Génération</title>
+<meta name="description" content="Plateforme de gestion de l'ONG Fria Nouvelle Génération">
+<meta name="theme-color" content="#1a6b3a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FNG">
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;Fria Nouvelle G%C3%A9n%C3%A9ration&quot;,&quot;short_name&quot;:&quot;FNG&quot;,&quot;description&quot;:&quot;Plateforme de gestion FNG&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#1a6b3a&quot;,&quot;theme_color&quot;:&quot;#1a6b3a&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Ccircle cx='96' cy='96' r='96' fill='%231a6b3a'/%3E%3Ctext x='50%25' y='56%25' font-size='90' text-anchor='middle' dominant-baseline='middle' fill='white' font-family='Arial Black,sans-serif' font-weight='900'%3EFNG%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}">
+<!-- Apple touch icon inline SVG via data URI -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%231a6b3a'/><text x='50%25' y='56%25' font-size='80' text-anchor='middle' dominant-baseline='middle' fill='white' font-family='Arial Black,sans-serif' font-weight='900'>FNG</text></svg>">
 <style>
 :root {
   --vert:#1a6b3a;--vert2:#2d8a50;--vert-pale:#e8f5ee;--vert-pale2:#d0eddb;
@@ -157,33 +166,90 @@ tr:hover td{background:var(--vert-pale)}
 .ovbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:99}
 .ovbg.open{display:block}
 
+/* ══ BOTTOM NAV BAR (mobile uniquement) ══ */
+.bottom-nav{display:none}
+
 @media(max-width:768px){
+  /* Empêche le débordement horizontal */
+  html,body{overflow-x:hidden;max-width:100vw}
+
+  /* Sidebar masquée — on n'utilise plus le hamburger */
   .sidebar{transform:translateX(-100%);z-index:200}.sidebar.open{transform:translateX(0)}
   .main{margin-left:0}.menu-btn{display:block}
+
+  /* Contenu principal avec espace pour la bottom nav */
+  .main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .content{padding:12px}
   .sg{grid-template-columns:1fr 1fr}.two,.three{grid-template-columns:1fr}
   .fg2{grid-template-columns:1fr}.topbar{padding:10px 14px}
+
   /* Zones tactiles confortables */
-  .btn{padding:10px 16px;min-height:42px}
+  .btn{padding:10px 16px;min-height:44px}
   .btn-sm{padding:8px 13px;min-height:38px;font-size:13px}
   .btn-xs{padding:7px 11px;min-height:34px;font-size:12px}
-  .ni{padding:14px 20px;font-size:14px}
+
   /* Tableaux scrollables */
   .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:500px}
-  /* Modales adaptées mobile */
-  .modal-box{width:96vw;max-width:96vw;max-height:90vh;overflow-y:auto;margin:5vh auto}
+  table{min-width:480px}
+
+  /* Modales adaptées mobile — remontent depuis le bas */
+  .mo{align-items:flex-end;padding:0}
+  .mb{border-radius:18px 18px 0 0;width:100%;max-width:100%;max-height:92vh;margin:0}
+
   /* Login box */
   .login-box{padding:28px 20px}
   .sc .vl{font-size:26px}
-  /* Toolbar actions en colonne */
+
+  /* Toolbar */
   .ch{flex-wrap:wrap;gap:8px}
   .ch>div{display:flex;flex-wrap:wrap;gap:6px}
+
+  /* ── BOTTOM NAV BAR ── */
+  .bottom-nav{
+    display:flex;
+    position:fixed;
+    bottom:0;left:0;right:0;
+    height:calc(60px + env(safe-area-inset-bottom,0px));
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    background:white;
+    border-top:1px solid var(--gris-leg);
+    z-index:150;
+    box-shadow:0 -2px 16px rgba(0,0,0,.08);
+  }
+  .bn-item{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    cursor:pointer;
+    padding:8px 4px;
+    font-size:10px;
+    font-weight:600;
+    color:var(--gris-txt);
+    transition:color .15s;
+    position:relative;
+    border:none;
+    background:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bn-item .bn-icon{font-size:20px;line-height:1}
+  .bn-item .bn-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;text-align:center}
+  .bn-item.active{color:var(--vert)}
+  .bn-item.active .bn-icon{transform:scale(1.1)}
+  .bn-dot{position:absolute;top:6px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--rouge);display:none;border:2px solid white}
+  .bn-more{position:relative}
+
+  /* Topbar : cacher le bouton notif dans la topbar sur mobile (il est dans la bottom nav) */
+  .notif-btn{display:none}
 }
+
 @media(max-width:420px){
   .sg{grid-template-columns:1fr}
   .topbar .pt{font-size:14px}
   .content{padding:10px}
+  .bn-item .bn-label{font-size:8px;max-width:44px}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -217,6 +283,26 @@ tr:hover td{background:var(--vert-pale)}
 <div id="app">
 <div class="ovbg" id="ovbg" onclick="closeSB()"></div>
 
+<!-- ══ BOTTOM NAV BAR (visible sur mobile uniquement) ══ -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bn-item" id="bn-dashboard" onclick="showPage('dashboard')">
+    <span class="bn-icon">🏠</span><span class="bn-label">Accueil</span>
+  </button>
+  <button class="bn-item" id="bn-membres" onclick="showPage('membres')">
+    <span class="bn-icon">👥</span><span class="bn-label">Membres</span>
+  </button>
+  <button class="bn-item" id="bn-finances" onclick="showPage('finances')">
+    <span class="bn-icon">💰</span><span class="bn-label">Finances</span>
+  </button>
+  <button class="bn-item" id="bn-activites" onclick="showPage('activites')">
+    <span class="bn-icon">📋</span><span class="bn-label">Activités</span>
+  </button>
+  <button class="bn-item bn-more" id="bn-more" onclick="toggleSB()">
+    <span class="bn-icon">☰</span><span class="bn-label">Plus</span>
+    <span class="bn-dot" id="bn-notif-dot"></span>
+  </button>
+</nav>
+
 <div class="sidebar" id="sidebar">
   <div class="sl">
     <div class="on">ONG</div>
@@ -230,7 +316,7 @@ tr:hover td{background:var(--vert-pale)}
   </div>
 </div>
 
-<div class="main" id="main-content" style="overflow-y:auto;height:100vh;">
+<div class="main" id="main-content" style="overflow-y:auto;overflow-x:hidden;height:100vh;">
   <div class="topbar">
     <div class="tb-l">
       <button class="menu-btn" onclick="toggleSB()">☰</button>
@@ -1580,6 +1666,10 @@ function showPage(id) {
   document.documentElement.scrollTop = 0;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  // Sync bottom nav
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  const bnEl = document.getElementById('bn-'+id);
+  if(bnEl) bnEl.classList.add('active');
   const pageEl = document.getElementById('page-'+id);
   if(pageEl) pageEl.classList.add('active');
   document.getElementById('page-title').textContent = PAGE_LABELS[id]||id;
@@ -1903,8 +1993,10 @@ function updateNotifBadge(){
   const pending=DB.notifications.filter(n=>n.statut==='en attente'&&userShouldReceiveNotif(n,currentUser)).length;
   const badge=document.getElementById('notif-badge');
   const dot=document.getElementById('notif-dot-nav');
+  const bnDot=document.getElementById('bn-notif-dot');
   if(badge){badge.textContent=pending;badge.style.display=pending>0?'block':'none';}
   if(dot)dot.style.display=pending>0?'block':'none';
+  if(bnDot)bnDot.style.display=pending>0?'block':'none';
 }
 
 function renderNotifications(){
