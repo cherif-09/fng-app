@@ -1320,7 +1320,8 @@ const SUPA_URL = 'https://iiximcnipbpiequywbpj.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpeGltY25pcGJwaWVxdXl3YnBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExOTkxOTIsImV4cCI6MjEwNjc3NTE5Mn0._B51khiwzictovnRHLMNfJPGMVOtnfTP_-dPpJX6Dq4';
 
 async function sbGet(table, filters='') {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filters}&order=created_at.asc`, {
+  const query = filters ? `?${filters}` : '';
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}${query}`, {
     headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY}
   });
   return res.json();
@@ -4206,7 +4207,16 @@ function ouvrirModalTransaction(type){
   document.getElementById('mf-cat').value = type==='sortie'?'Fournitures & matériel':'Don / Sponsoring';
   document.getElementById('mf-mode').value = 'Espèces';
   document.getElementById('m-fin-titre').textContent = type==='sortie' ? '📤 Nouvelle dépense' : '💰 Nouvelle entrée';
-  remplirSelectActivites('mf-activite');
+  const selAct = document.getElementById('mf-activite');
+  if(selAct){
+    selAct.innerHTML = '<option value="">— Aucune —</option>';
+    (DB.activites||[]).forEach(a=>{
+      const o=document.createElement('option');
+      o.value=a.id||a.nom||'';
+      o.textContent=a.nom||a.titre||a.id||'';
+      selAct.appendChild(o);
+    });
+  }
   onFinTypeChange();
   openM('m-fin');
 }
