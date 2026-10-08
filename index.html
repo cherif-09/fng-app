@@ -1492,7 +1492,45 @@ async function safeGet(table, filters='') {
   } catch(e) { return []; }
 }
 
-async function loadAllData() {
+const CACHE_KEY = 'fng_db_cache';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function sauvegarderCache() {
+  try {
+    const cache = {
+      ts: Date.now(),
+      membres: DB.membres,
+      transactions: DB.transactions,
+      activites: DB.activites,
+      beneficiaires: DB.beneficiaires,
+      users: DB.users.map(u=>({...u, pwd: undefined})), // ne pas cacher les mots de passe
+      messages: DB.messages,
+      notifications: DB.notifications,
+      extraAcces: DB.extraAcces
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch(e) { /* quota dépassé, ignorer */ }
+}
+
+function chargerCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return false;
+    const cache = JSON.parse(raw);
+    if(Date.now() - cache.ts > CACHE_TTL) return false; // cache expiré
+    DB.membres = cache.membres || [];
+    DB.transactions = cache.transactions || [];
+    DB.activites = cache.activites || [];
+    DB.beneficiaires = cache.beneficiaires || [];
+    DB.users = cache.users || [];
+    DB.messages = cache.messages || [];
+    DB.notifications = cache.notifications || [];
+    DB.extraAcces = cache.extraAcces || [];
+    return true;
+  } catch(e) { return false; }
+}
+
+async function fetchDepuisSupabase() {
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
     safeGet('membres','select=id,prenom,nom,role,tel,email,adhesion,ddn,sexe,nationalite,quartier,adresse,type_adhesion,cotis,statut,numero,niveau,formation,competences,date_sortie,obs_sortie'),
     safeGet('transactions','order=date.desc'),
@@ -1514,11 +1552,31 @@ async function loadAllData() {
     userId: r.user_id, section: r.section, niveau: r.niveau,
     expiration: r.expiration ? new Date(r.expiration).getTime() : null, id: r.id
   }));
-  // Rafraîchir currentUser avec les données à jour (acces_volets inclus)
   if(currentUser) {
     const fresh = DB.users.find(u=>u.id===currentUser.id);
     if(fresh) currentUser = fresh;
   }
+  sauvegarderCache();
+}
+
+async function loadAllData(forceRefresh=false) {
+  // Si cache valide et pas de forçage, afficher instantanément depuis le cache
+  const cacheOk = !forceRefresh && chargerCache();
+  if(cacheOk) {
+    // Mettre à jour currentUser depuis le cache
+    if(currentUser) {
+      const fresh = DB.users.find(u=>u.id===currentUser.id);
+      if(fresh) currentUser = {...currentUser, ...fresh};
+    }
+    // Rafraîchir en arrière-plan sans bloquer l'affichage
+    fetchDepuisSupabase().then(()=>{
+      renderDashboard();
+      updateNotifBadge();
+    }).catch(()=>{});
+    return;
+  }
+  // Pas de cache : chargement normal depuis Supabase
+  await fetchDepuisSupabase();
 }
 
 let currentUser = null;
