@@ -1494,7 +1494,7 @@ async function safeGet(table, filters='') {
 
 async function loadAllData() {
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
-    safeGet('membres'),
+    safeGet('membres','select=id,prenom,nom,role,tel,email,adhesion,ddn,sexe,nationalite,quartier,adresse,type_adhesion,cotis,statut,numero,niveau,formation,competences,date_sortie,obs_sortie'),
     safeGet('transactions','order=date.desc'),
     safeGet('activites'),
     safeGet('beneficiaires'),
@@ -1781,7 +1781,10 @@ function renderMembres(){
   const tbody=document.getElementById('tbody-membres');
   if(!tbody)return;
   const filtre=document.getElementById('filter-m-statut')?document.getElementById('filter-m-statut').value:'';
-  let liste=DB.membres;
+  let liste=[...DB.membres].sort((a,b)=>{
+    const na=a.numero||'',nb=b.numero||'';
+    return na.localeCompare(nb,undefined,{numeric:true,sensitivity:'base'});
+  });
   if(filtre)liste=liste.filter(m=>m.statut===filtre);
   if(!liste.length){
     tbody.innerHTML='<tr><td colspan="9"><div class="empty"><div class="ei">👥</div><p>Aucun membre enregistré</p></div></td></tr>';return;
@@ -2765,8 +2768,13 @@ function genNumMembre(){
   return 'FNG-M-' + String(n).padStart(3,'0');
 }
 
-function ouvrirModalMembre(id){
+async function ouvrirModalMembre(id){
   membreEnEdition = id ? DB.membres.find(m=>m.id===id) : null;
+  // Charger la photo si pas encore en mémoire
+  if(membreEnEdition && !membreEnEdition.photo){
+    const res = await safeGet('membres', `select=id,photo&id=eq.${membreEnEdition.id}`);
+    if(res && res[0]) membreEnEdition.photo = res[0].photo || null;
+  }
   document.getElementById('m-membre-titre').textContent = membreEnEdition ? 'Modifier le membre' : 'Ajouter un membre';
   const fields = ['mm-prenom','mm-nom','mm-ddn','mm-nationalite','mm-quartier','mm-tel','mm-email','mm-adresse','mm-role','mm-adhesion','mm-formation','mm-competences','mm-date-sortie','mm-obs-sortie'];
   fields.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -2809,6 +2817,8 @@ function ouvrirModalMembre(id){
 async function saveMembre(){
   const prenom=v('mm-prenom'),nom=v('mm-nom'),role=v('mm-role'),tel=v('mm-tel'),adhesion=v('mm-adhesion');
   if(!prenom||!role||!tel||!adhesion){alert('Prénom, rôle, téléphone et date adhésion obligatoires.');return;}
+  const photoVal=document.getElementById('membre-photo-data').value||null;
+  // Données texte uniquement (rapide)
   const data={prenom,nom,role,tel,adhesion,
     ddn:v('mm-ddn'),sexe:document.getElementById('mm-sexe').value,
     nationalite:v('mm-nationalite'),quartier:v('mm-quartier'),
@@ -2819,14 +2829,18 @@ async function saveMembre(){
     numero:v('mm-num')||genNumMembre(),
     niveau:v('mm-niveau'),
     formation:v('mm-formation'),competences:v('mm-competences'),
-    photo:document.getElementById('membre-photo-data').value||null,
     date_sortie:v('mm-date-sortie'),
     obs_sortie:v('mm-obs-sortie')};
   if(membreEnEdition){
+    // Photo : ne renvoyer que si elle a changé
+    const photoChanged = photoVal !== (membreEnEdition.photo||null);
+    if(photoChanged) data.photo = photoVal;
     await sbUpdate('membres', membreEnEdition.id, data);
+    if(photoChanged) membreEnEdition.photo = photoVal;
     Object.assign(membreEnEdition, data);
   } else {
     data.id='m'+Date.now();
+    data.photo=photoVal; // inclure la photo à la création
     await sbInsert('membres', data);
     DB.membres.push(data);
   }
@@ -2851,8 +2865,13 @@ async function confirmerSortie(){
   closeM('m-sortie');membreEnSortie=null;renderMembres();
 }
 
-function voirDetailMembre(id){
+async function voirDetailMembre(id){
   const m=DB.membres.find(x=>x.id===id);if(!m)return;
+  // Charger la photo si pas encore en mémoire
+  if(!m.photo){
+    const res = await safeGet('membres', `select=id,photo&id=eq.${m.id}`);
+    if(res && res[0]) m.photo = res[0].photo || null;
+  }
   document.getElementById('detail-m-titre').textContent=m.prenom+' '+m.nom;
   document.getElementById('detail-m-body').innerHTML=`
     <div style="text-align:center;margin-bottom:16px">
