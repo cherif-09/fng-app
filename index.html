@@ -805,7 +805,7 @@ tr:hover td{background:var(--vert-pale)}
       <div class="fgg"><label>Date de naissance</label><input type="date" id="mm-ddn"></div>
       <div class="fgg"><label>Sexe</label><select id="mm-sexe"><option value="M">Masculin</option><option value="F">Féminin</option></select></div>
       <div class="fgg"><label>Nationalité</label><input id="mm-nationalite" value="Guinéenne" placeholder="Guinéenne"></div>
-      <div class="fgg"><label>Quartier / Localité</label><input id="mm-quartier" placeholder="ex: Kolisoko"></div>
+      <div class="fgg"><label>Lieu de naissance</label><input id="mm-quartier" placeholder="ex: Kolisoko, Fria…"></div>
     </div>
     <!-- CONTACT -->
     <div style="background:var(--vert);color:white;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:700;margin:18px 0 14px">📞 CONTACT</div>
@@ -2976,7 +2976,7 @@ async function voirDetailMembre(id){
         <div style="font-size:11px;font-weight:800;color:var(--vert);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Coordonnées</div>
         ${ligneInfo('📞','Téléphone',m.tel||'')}
         ${ligneInfo('📧','Email',m.email||'')}
-        ${ligneInfo('📍','Quartier',m.quartier||'')}
+        ${ligneInfo('📍','Lieu de naissance',m.quartier||'')}
         ${ligneInfo('🏠','Adresse',m.adresse||'')}
         ${ligneInfo('🌍','Nationalité',m.nationalite||'')}
       </div>
@@ -3018,7 +3018,7 @@ function filterMembres(){
 
 
 function exportMembres(){
-  const h=['Numéro','Prénom','Nom','Rôle','Téléphone','Email','Quartier','Adhésion','Type','Cotisation','Statut','Formation'];
+  const h=['Numéro','Prénom','Nom','Rôle','Téléphone','Email','Lieu de naissance','Adhésion','Type','Cotisation','Statut','Formation'];
   const r=DB.membres.map(m=>[m.numero||'',m.prenom||'',m.nom||'',m.role||'',m.tel||'',m.email||'',m.quartier||'',m.adhesion||'',m.type||'',m.cotis||'',m.statut||'',m.formation||'']);
   dlCSV('Membres_FNG_'+new Date().toISOString().slice(0,10)+'.csv',h,r);
 }
@@ -3027,7 +3027,7 @@ function exportMembres(){
 function telechargerModeleMembres(){
   if(typeof XLSX==='undefined'){alert('Bibliothèque Excel non chargée, vérifiez votre connexion.');return;}
   const ws=XLSX.utils.aoa_to_sheet([
-    ['Numéro','Prénom*','Nom*','Rôle','Téléphone','Email','Quartier','Date adhésion (AAAA-MM-JJ)','Type adhésion','Cotisation','Statut','Formation/Niveau'],
+    ['Numéro','Prénom*','Nom*','Rôle','Téléphone','Email','Lieu de naissance','Date adhésion (AAAA-MM-JJ)','Type adhésion','Cotisation','Statut','Formation/Niveau'],
     ['FNG-M-001','Mamadou','Diallo','Membre','622000001','mamadou@email.com','Abattoir','2025-01-15','Adhérent actif','À jour','Actif','Licence']
   ]);
   ws['!cols']=[{wch:14},{wch:14},{wch:14},{wch:16},{wch:14},{wch:22},{wch:14},{wch:22},{wch:18},{wch:12},{wch:10},{wch:18}];
@@ -3058,7 +3058,7 @@ async function importMembresExcel(input){
       role:(r['Rôle']||r['Role']||'Membre').toString().trim(),
       tel:(r['Téléphone']||r['Telephone']||'').toString().trim(),
       email:(r['Email']||'').toString().trim(),
-      quartier:(r['Quartier']||'').toString().trim(),
+      quartier:(r['Lieu de naissance']||r['Quartier']||'').toString().trim(),
       adhesion:(r['Date adhésion (AAAA-MM-JJ)']||'').toString().trim(),
       type_adhesion:(r['Type adhésion']||'Adhérent actif').toString().trim(),
       cotis:(r['Cotisation']||'À jour').toString().trim(),
