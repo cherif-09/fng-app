@@ -1428,6 +1428,7 @@ async function sbGet(table, filters='') {
 }
 
 async function sbInsert(table, data) {
+  console.log(`[sbInsert] Envoi vers ${table}...`);
   const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
@@ -1437,10 +1438,12 @@ async function sbInsert(table, data) {
   if(!res.ok){
     const err = await res.text();
     console.error(`[sbInsert] ERREUR ${res.status} sur ${table}:`, err);
-    alert(`⚠️ Erreur de sauvegarde dans "${table}" (${res.status}):\n${err}\n\nVérifie que la table et ses colonnes existent dans Supabase.`);
+    alert(`⚠️ Erreur de sauvegarde (${res.status}):\n${err}`);
     return null;
   }
-  return res.json();
+  const result = await res.json();
+  console.log(`[sbInsert] ✅ ${table} sauvegardé:`, result);
+  return result;
 }
 
 async function sbUpdate(table, id, data) {
@@ -1531,12 +1534,8 @@ function chargerCache() {
 }
 
 async function fetchDepuisSupabase() {
-  // Conserver les photos déjà chargées en mémoire (elles ne sont pas dans le select sans photo)
-  const photosEnMemoire = {};
-  DB.membres.forEach(m => { if(m.photo) photosEnMemoire[m.id] = m.photo; });
-
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
-    safeGet('membres','select=id,prenom,nom,role,tel,email,adhesion,ddn,sexe,nationalite,quartier,adresse,type_adhesion,cotis,statut,numero,niveau,formation,competences,date_sortie,obs_sortie'),
+    safeGet('membres','select=id,prenom,nom,role,tel,email,adhesion,ddn,sexe,nationalite,quartier,adresse,type_adhesion,cotis,statut,numero,niveau,formation,competences,date_sortie,obs_sortie,photo'),
     safeGet('transactions','order=date.desc'),
     safeGet('activites'),
     safeGet('beneficiaires'),
@@ -1545,8 +1544,6 @@ async function fetchDepuisSupabase() {
     safeGet('notifications','order=date.desc'),
     safeGet('extra_acces')
   ]);
-  // Réinjecter les photos conservées en mémoire
-  membres.forEach(m => { if(photosEnMemoire[m.id]) m.photo = photosEnMemoire[m.id]; });
   DB.membres = membres;
   DB.transactions = transactions.map(t=>({...t, montant: parseFloat(t.montant)||0}));
   DB.activites = activites;
@@ -2834,11 +2831,7 @@ function genNumMembre(){
 
 async function ouvrirModalMembre(id){
   membreEnEdition = id ? DB.membres.find(m=>m.id===id) : null;
-  // Charger la photo si pas encore en mémoire
-  if(membreEnEdition && !membreEnEdition.photo){
-    const res = await safeGet('membres', `select=id,photo&id=eq.${membreEnEdition.id}`);
-    if(res && res[0]) membreEnEdition.photo = res[0].photo || null;
-  }
+  // La photo est déjà dans DB.membres (chargée avec le select complet)
   document.getElementById('m-membre-titre').textContent = membreEnEdition ? 'Modifier le membre' : 'Ajouter un membre';
   const fields = ['mm-prenom','mm-nom','mm-ddn','mm-nationalite','mm-quartier','mm-tel','mm-email','mm-adresse','mm-role','mm-adhesion','mm-formation','mm-competences','mm-date-sortie','mm-obs-sortie'];
   fields.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -2915,13 +2908,16 @@ async function saveMembre(){
     } else {
       data.id='m'+Date.now();
       data.photo=photoVal;
-      // D'abord Supabase — on attend la confirmation avant tout
+      // Envoyer à Supabase et attendre la confirmation
       const ok = await sbInsert('membres', data);
-      if(ok === null) { // sbInsert a déjà affiché l'erreur
+      if(ok === null) {
+        // Erreur Supabase — le membre N'EST PAS en base, on arrête
         if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
         return;
       }
-      DB.membres.push(data);
+      // Supabase a retourné le vrai enregistrement (avec son id côté serveur si différent)
+      const membreSauvegarde = (Array.isArray(ok) && ok[0]) ? ok[0] : data;
+      DB.membres.push(membreSauvegarde);
     }
     // Supabase a confirmé → mettre à jour cache et UI
     sauvegarderCache();
@@ -2953,14 +2949,6 @@ async function confirmerSortie(){
 
 async function voirDetailMembre(id){
   const m=DB.membres.find(x=>x.id===id);if(!m)return;
-  // Charger la photo si pas encore en mémoire
-  if(!m.photo){
-    const res = await safeGet('membres', `select=id,photo&id=eq.${m.id}`);
-    if(res && res[0] && res[0].photo){
-      m.photo = res[0].photo;
-      sauvegarderCache(); // mémoriser la photo pour éviter de la recharger
-    }
-  }
   const statutCls = m.statut==='Actif'?'bg-g':m.statut==='Sortant'?'bg-r':'bg-o';
   const cotisClass = m.cotis==='À jour'?'bg-g':'bg-r';
   const ligneInfo = (ic,lab,val)=>val?`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--gris-leg)"><span style="font-size:15px;width:22px;flex-shrink:0">${ic}</span><div><div style="font-size:10px;color:var(--gris-txt);font-weight:700;text-transform:uppercase;letter-spacing:.4px">${lab}</div><div style="font-size:13px;font-weight:600">${val}</div></div></div>`:'';
