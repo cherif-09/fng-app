@@ -1434,6 +1434,12 @@ async function sbInsert(table, data) {
               'Content-Type': 'application/json', 'Prefer': 'return=representation'},
     body: JSON.stringify(data)
   });
+  if(!res.ok){
+    const err = await res.text();
+    console.error(`[sbInsert] ERREUR ${res.status} sur ${table}:`, err);
+    alert(`⚠️ Erreur de sauvegarde dans "${table}" (${res.status}):\n${err}\n\nVérifie que la table et ses colonnes existent dans Supabase.`);
+    return null;
+  }
   return res.json();
 }
 
@@ -1489,7 +1495,7 @@ async function safeGet(table, filters='') {
 async function loadAllData() {
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
     safeGet('membres'),
-    safeGet('transactions','order=created_at.desc'),
+    safeGet('transactions','order=date.desc'),
     safeGet('activites'),
     safeGet('beneficiaires'),
     safeGet('users'),
