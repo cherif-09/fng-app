@@ -1266,7 +1266,7 @@ tr:hover td{background:var(--vert-pale)}
   </div>
   <div class="mf"><button class="btn btn-o" onclick="closeM('m-sortie')">Annuler</button><button class="btn btn-r" onclick="confirmerSortie()">Confirmer la sortie</button></div>
 </div></div>
-<div class="mo" id="m-detail-membre"><div class="mb" style="max-width:500px">
+<div class="mo" id="m-detail-membre"><div class="mb" style="max-width:680px">
   <div class="mh"><div class="mt" id="detail-m-titre">Fiche membre</div><button class="mc" onclick="closeM('m-detail-membre')">×</button></div>
   <div class="mbody" id="detail-m-body"></div>
   <div class="mf" id="detail-m-footer"></div>
@@ -1531,6 +1531,10 @@ function chargerCache() {
 }
 
 async function fetchDepuisSupabase() {
+  // Conserver les photos déjà chargées en mémoire (elles ne sont pas dans le select sans photo)
+  const photosEnMemoire = {};
+  DB.membres.forEach(m => { if(m.photo) photosEnMemoire[m.id] = m.photo; });
+
   const [membres, transactions, activites, beneficiaires, users, messages, notifs, extraAcc] = await Promise.all([
     safeGet('membres','select=id,prenom,nom,role,tel,email,adhesion,ddn,sexe,nationalite,quartier,adresse,type_adhesion,cotis,statut,numero,niveau,formation,competences,date_sortie,obs_sortie'),
     safeGet('transactions','order=date.desc'),
@@ -1541,6 +1545,8 @@ async function fetchDepuisSupabase() {
     safeGet('notifications','order=date.desc'),
     safeGet('extra_acces')
   ]);
+  // Réinjecter les photos conservées en mémoire
+  membres.forEach(m => { if(photosEnMemoire[m.id]) m.photo = photosEnMemoire[m.id]; });
   DB.membres = membres;
   DB.transactions = transactions.map(t=>({...t, montant: parseFloat(t.montant)||0}));
   DB.activites = activites;
@@ -2902,6 +2908,8 @@ async function saveMembre(){
     await sbInsert('membres', data);
     DB.membres.push(data);
   }
+  // Mettre à jour le cache avec la photo
+  sauvegarderCache();
   closeM('m-membre');membreEnEdition=null;renderMembres();
 }
 
@@ -2928,34 +2936,64 @@ async function voirDetailMembre(id){
   // Charger la photo si pas encore en mémoire
   if(!m.photo){
     const res = await safeGet('membres', `select=id,photo&id=eq.${m.id}`);
-    if(res && res[0]) m.photo = res[0].photo || null;
+    if(res && res[0] && res[0].photo){
+      m.photo = res[0].photo;
+      sauvegarderCache(); // mémoriser la photo pour éviter de la recharger
+    }
   }
+  const statutCls = m.statut==='Actif'?'bg-g':m.statut==='Sortant'?'bg-r':'bg-o';
+  const cotisClass = m.cotis==='À jour'?'bg-g':'bg-r';
+  const ligneInfo = (ic,lab,val)=>val?`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--gris-leg)"><span style="font-size:15px;width:22px;flex-shrink:0">${ic}</span><div><div style="font-size:10px;color:var(--gris-txt);font-weight:700;text-transform:uppercase;letter-spacing:.4px">${lab}</div><div style="font-size:13px;font-weight:600">${val}</div></div></div>`:'';
+
   document.getElementById('detail-m-titre').textContent=m.prenom+' '+m.nom;
   document.getElementById('detail-m-body').innerHTML=`
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="width:90px;height:90px;border-radius:50%;margin:0 auto 8px;overflow:hidden;background:var(--gris-leg);display:flex;align-items:center;justify-content:center;font-size:36px;border:3px solid var(--vert)">
+    <!-- En-tête photo + identité -->
+    <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--vert-pale);border-radius:10px;margin-bottom:16px">
+      <div style="width:80px;height:80px;border-radius:50%;flex-shrink:0;overflow:hidden;background:var(--gris-leg);display:flex;align-items:center;justify-content:center;font-size:32px;border:3px solid var(--vert)">
         ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover">`:'👤'}</div>
-      <div style="font-weight:800;font-size:16px">${m.prenom} ${m.nom}</div>
-      <div style="font-size:12px;color:var(--gris-txt)">${m.role||'—'}</div>
-      <div style="margin-top:6px"><span class="bg bg-b">${m.numero||'—'}</span></div>
+      <div>
+        <div style="font-weight:900;font-size:17px">${m.prenom} ${m.nom}</div>
+        <div style="font-size:12px;color:var(--gris-txt);margin:2px 0">${m.role||'—'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <span class="bg bg-b" style="font-size:12px">${m.numero||'—'}</span>
+          <span class="bg ${statutCls}">${m.statut||'Actif'}</span>
+          <span class="bg ${cotisClass}">${m.cotis||'—'}</span>
+        </div>
+      </div>
     </div>
-    <div style="font-size:13px;display:flex;flex-direction:column;gap:6px">
-      <div>📞 <strong>${m.tel||'—'}</strong></div>
-      <div>📧 <strong>${m.email||'—'}</strong></div>
-      <div>📍 <strong>${m.quartier||'—'}</strong></div>
-      <div>🗓 Adhésion : <strong>${m.adhesion||'—'}</strong></div>
-      <div>🎓 <strong>${m.formation||'—'}</strong></div>
-      <div>💼 <strong>${m.type||'—'}</strong> · Cotisation : <span class="bg ${m.cotis==='À jour'?'bg-g':'bg-r'}">${m.cotis||'—'}</span></div>
-      <div><span class="bg ${m.statut==='Actif'?'bg-g':m.statut==='Sortant'?'bg-r':'bg-o'}">${m.statut||'Actif'}</span></div>
-      ${m.statut==='Sortant'?`<div>🚪 Sortie: <strong>${m.dateSortie||'—'}</strong> — ${m.motifSortie||'—'}</div>`:''}
-    </div>`;
+    <!-- Sections -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px">
+      <!-- Colonne gauche : coordonnées -->
+      <div>
+        <div style="font-size:11px;font-weight:800;color:var(--vert);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Coordonnées</div>
+        ${ligneInfo('📞','Téléphone',m.tel||'')}
+        ${ligneInfo('📧','Email',m.email||'')}
+        ${ligneInfo('📍','Quartier',m.quartier||'')}
+        ${ligneInfo('🏠','Adresse',m.adresse||'')}
+        ${ligneInfo('🌍','Nationalité',m.nationalite||'')}
+      </div>
+      <!-- Colonne droite : adhésion & formation -->
+      <div>
+        <div style="font-size:11px;font-weight:800;color:var(--vert);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Adhésion & Formation</div>
+        ${ligneInfo('📅','Date naissance',m.ddn||'')}
+        ${ligneInfo('⚥','Sexe',m.sexe||'')}
+        ${ligneInfo('🗓','Date adhésion',m.adhesion||'')}
+        ${ligneInfo('🤝','Type adhésion',m.type_adhesion||m.type||'')}
+        ${ligneInfo('🎓','Formation',m.formation||'')}
+        ${ligneInfo('📚','Niveau',m.niveau||'')}
+      </div>
+    </div>
+    ${m.competences?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:800;color:var(--vert);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Compétences</div><div style="font-size:13px;background:var(--gris-fond);border-radius:8px;padding:8px 12px">${m.competences}</div></div>`:''}
+    ${m.statut==='Sortant'?`<div style="margin-top:12px;background:var(--rouge-pale);border-radius:8px;padding:10px 12px"><div style="font-size:11px;font-weight:800;color:var(--rouge);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">🚪 Sortie de l'effectif</div><div style="font-size:13px">Date : <strong>${m.date_sortie||'—'}</strong></div>${m.obs_sortie?`<div style="font-size:13px;margin-top:4px">Motif : ${m.obs_sortie}</div>`:''}</div>`:''}
+  `;
   const accM=canAccess('membres');
   const peutEditerM=accM==='ecriture';
   document.getElementById('detail-m-footer').innerHTML=
     (peutEditerM?`<button class="btn btn-o" onclick="closeM('m-detail-membre');ouvrirModalMembre('${m.id}')">✏️ Modifier</button>
-    <button class="btn btn-o" onclick="closeM('m-detail-membre');ouvrirSortieMembre('${m.id}')">🚪 Sortir</button>
+    ${m.statut!=='Sortant'?`<button class="btn btn-o" onclick="closeM('m-detail-membre');ouvrirSortieMembre('${m.id}')">🚪 Sortir</button>`:''}
     <button class="btn btn-p" onclick="closeM('m-detail-membre');imprimerBadgeSeul('${m.id}','membre')">🪪 Badge</button>`
-    :`<button class="btn btn-o" onclick="closeM('m-detail-membre')">Fermer</button>`);
+    :`<button class="btn btn-p" onclick="closeM('m-detail-membre');imprimerBadgeSeul('${m.id}','membre')">🪪 Badge</button>
+    <button class="btn btn-o" onclick="closeM('m-detail-membre')">Fermer</button>`);
   openM('m-detail-membre');
 }
 
