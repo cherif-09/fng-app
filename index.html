@@ -840,7 +840,7 @@ tr:hover td{background:var(--vert-pale)}
       </div>
     </div>
   </div>
-  <div class="mf"><button class="btn btn-o" onclick="closeM('m-membre')">Annuler</button><button class="btn btn-p" onclick="saveMembre()">Enregistrer</button></div>
+  <div class="mf"><button class="btn btn-o" onclick="closeM('m-membre')">Annuler</button><button class="btn btn-p" id="btn-save-membre" onclick="saveMembre()">Enregistrer</button></div>
 </div></div>
 
 <!-- Modal Finance -->
@@ -2881,8 +2881,12 @@ async function ouvrirModalMembre(id){
 async function saveMembre(){
   const prenom=v('mm-prenom'),nom=v('mm-nom'),role=v('mm-role'),tel=v('mm-tel'),adhesion=v('mm-adhesion');
   if(!prenom||!role||!tel||!adhesion){alert('Prénom, rôle, téléphone et date adhésion obligatoires.');return;}
+
+  // ── Feedback immédiat : désactiver le bouton ──
+  const btnSave=document.getElementById('btn-save-membre');
+  if(btnSave){btnSave.disabled=true;btnSave.textContent='⏳ Enregistrement...';}
+
   const photoVal=document.getElementById('membre-photo-data').value||null;
-  // Données texte uniquement (rapide)
   const data={prenom,nom,role,tel,adhesion,
     ddn:v('mm-ddn'),sexe:document.getElementById('mm-sexe').value,
     nationalite:v('mm-nationalite'),quartier:v('mm-quartier'),
@@ -2895,22 +2899,34 @@ async function saveMembre(){
     formation:v('mm-formation'),competences:v('mm-competences'),
     date_sortie:v('mm-date-sortie'),
     obs_sortie:v('mm-obs-sortie')};
+
   if(membreEnEdition){
-    // Photo : ne renvoyer que si elle a changé
+    // ── OPTIMISTIC UPDATE : mettre à jour l'UI immédiatement ──
+    const idAMettreAJour = membreEnEdition.id; // sauvegarder l'id avant de nullifier
     const photoChanged = photoVal !== (membreEnEdition.photo||null);
     if(photoChanged) data.photo = photoVal;
-    await sbUpdate('membres', membreEnEdition.id, data);
     if(photoChanged) membreEnEdition.photo = photoVal;
     Object.assign(membreEnEdition, data);
+    sauvegarderCache();
+    closeM('m-membre');membreEnEdition=null;renderMembres();
+    // Puis sauvegarder en arrière-plan
+    sbUpdate('membres', idAMettreAJour, data).catch(e=>{
+      console.error('[saveMembre] Erreur update arrière-plan:', e);
+    });
   } else {
+    // Nouveau membre : on insère et on attend la réponse pour avoir l'ID Supabase
     data.id='m'+Date.now();
-    data.photo=photoVal; // inclure la photo à la création
-    await sbInsert('membres', data);
-    DB.membres.push(data);
+    data.photo=photoVal;
+    // Ajouter en mémoire tout de suite
+    DB.membres.push({...data});
+    sauvegarderCache();
+    closeM('m-membre');membreEnEdition=null;renderMembres();
+    // Puis envoyer à Supabase en arrière-plan
+    sbInsert('membres', data).catch(e=>{
+      console.error('[saveMembre] Erreur insert arrière-plan:', e);
+    });
   }
-  // Mettre à jour le cache avec la photo
-  sauvegarderCache();
-  closeM('m-membre');membreEnEdition=null;renderMembres();
+  if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
 }
 
 function ouvrirSortieMembre(id){
