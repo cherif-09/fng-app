@@ -2779,9 +2779,10 @@ function ouvrirModalMembre(id){
       const el=document.getElementById('mm-'+f);if(el)el.value=m[f]||'';
     });
     document.getElementById('mm-sexe').value=m.sexe||'M';
-    document.getElementById('mm-type').value=m.type||'Adhérent actif';
+    document.getElementById('mm-type').value=m.type_adhesion||m.type||'Adhérent actif';
     document.getElementById('mm-cotis').value=m.cotis||'À jour';
     document.getElementById('mm-statut').value=m.statut||'Actif';
+    document.getElementById('mm-niveau').value=m.niveau||'';
     document.getElementById('mm-num').value=m.numero||'';
     if(m.photo){
       document.getElementById('membre-photo-data').value=m.photo;
@@ -4327,7 +4328,7 @@ function ouvrirModalTransaction(type){
   openM('m-fin');
 }
 
-function saveTransaction(){
+async function saveTransaction(){
   const date = v('mf-date'), desc = v('mf-desc'), montantStr = v('mf-montant');
   const type = document.getElementById('mf-type').value;
   if(!date||!desc||!montantStr){alert('Date, libellé et montant sont obligatoires.');return;}
@@ -4337,14 +4338,16 @@ function saveTransaction(){
   const trans = {
     id: 'f'+Date.now(),
     numPiece: genNumPiece(),
-    date, desc, type,
-    cat: document.getElementById('mf-cat').value,
+    date,
+    description: desc,
+    type,
+    categorie: document.getElementById('mf-cat').value,
     montant,
-    benef: v('mf-benef'),
+    beneficiaire: v('mf-benef'),
     mode: document.getElementById('mf-mode').value,
     piece: v('mf-piece'),
     notes: v('mf-notes'),
-    activiteId: document.getElementById('mf-activite').value,
+    activite: document.getElementById('mf-activite').value,
     enregistrePar: currentUser.prenom+' '+currentUser.nom,
     dateEnregistrement: new Date().toISOString(),
     statut: 'validé'
@@ -4356,7 +4359,8 @@ function saveTransaction(){
     trans.demandeParId = currentUser.id;
   }
 
-  DB.transactions.push(trans);
+  await sbInsert('transactions', trans);
+  DB.transactions.unshift({...trans});
   closeM('m-fin');
   renderFinances();
   if(trans.statut==='en attente'){
@@ -4379,7 +4383,7 @@ function voirDetailTransaction(id){
       <div>📅 <strong>Date :</strong> ${t.date}</div>
       <div>🏷️ <strong>Catégorie :</strong> ${t.categorie||t.cat||'—'}</div>
       <div>💳 <strong>Mode :</strong> ${t.mode||'—'}</div>
-      ${t.benef?`<div>👤 <strong>Bénéf./Fourn. :</strong> ${t.benef}</div>`:''}
+      ${(t.beneficiaire||t.benef)?`<div>👤 <strong>Bénéf./Fourn. :</strong> ${t.beneficiaire||t.benef}</div>`:''}
       ${t.piece?`<div>📎 <strong>Pièce justif. :</strong> ${t.piece}</div>`:''}
       ${t.activiteId?`<div>📋 <strong>Activité :</strong> ${(DB.activites.find(a=>a.id===t.activiteId)||{titre:'—'}).titre}</div>`:''}
       <div style="border-top:1px solid var(--gris-leg);padding-top:8px;margin-top:4px;font-size:11px;color:var(--gris-txt)">
@@ -4401,7 +4405,7 @@ function ouvrirValiderDepense(id){
   openM('m-val-depense');
 }
 
-function validerDepense(){
+async function validerDepense(){
   if(!transEnValidation) return;
   const dec = document.getElementById('val-dep-decision').value;
   const obs = document.getElementById('val-dep-obs').value.trim();
@@ -4411,6 +4415,13 @@ function validerDepense(){
   transEnValidation.valideParNom = currentUser.prenom+' '+currentUser.nom;
   transEnValidation.dateValidation = new Date().toLocaleDateString('fr-FR');
   transEnValidation.obsValidation = obs;
+  await sbUpdate('transactions', transEnValidation.id, {
+    statut: dec,
+    valideParId: transEnValidation.valideParId,
+    valideParNom: transEnValidation.valideParNom,
+    dateValidation: transEnValidation.dateValidation,
+    obsValidation: obs
+  }).catch(()=>{});
   closeM('m-val-depense'); transEnValidation=null;
   renderFinances();
   renderValidations();
