@@ -2882,7 +2882,7 @@ async function saveMembre(){
   const prenom=v('mm-prenom'),nom=v('mm-nom'),role=v('mm-role'),tel=v('mm-tel'),adhesion=v('mm-adhesion');
   if(!prenom||!role||!tel||!adhesion){alert('Prénom, rôle, téléphone et date adhésion obligatoires.');return;}
 
-  // ── Feedback immédiat : désactiver le bouton ──
+  // Feedback visuel immédiat sur le bouton (ne bloque pas, juste indicatif)
   const btnSave=document.getElementById('btn-save-membre');
   if(btnSave){btnSave.disabled=true;btnSave.textContent='⏳ Enregistrement...';}
 
@@ -2900,33 +2900,37 @@ async function saveMembre(){
     date_sortie:v('mm-date-sortie'),
     obs_sortie:v('mm-obs-sortie')};
 
-  if(membreEnEdition){
-    // ── OPTIMISTIC UPDATE : mettre à jour l'UI immédiatement ──
-    const idAMettreAJour = membreEnEdition.id; // sauvegarder l'id avant de nullifier
-    const photoChanged = photoVal !== (membreEnEdition.photo||null);
-    if(photoChanged) data.photo = photoVal;
-    if(photoChanged) membreEnEdition.photo = photoVal;
-    Object.assign(membreEnEdition, data);
+  try {
+    if(membreEnEdition){
+      const photoChanged = photoVal !== (membreEnEdition.photo||null);
+      if(photoChanged) data.photo = photoVal;
+      // D'abord Supabase — on attend la confirmation avant tout
+      const ok = await sbUpdate('membres', membreEnEdition.id, data);
+      if(ok === null) { // sbUpdate a déjà affiché l'erreur
+        if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
+        return;
+      }
+      if(photoChanged) membreEnEdition.photo = photoVal;
+      Object.assign(membreEnEdition, data);
+    } else {
+      data.id='m'+Date.now();
+      data.photo=photoVal;
+      // D'abord Supabase — on attend la confirmation avant tout
+      const ok = await sbInsert('membres', data);
+      if(ok === null) { // sbInsert a déjà affiché l'erreur
+        if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
+        return;
+      }
+      DB.membres.push(data);
+    }
+    // Supabase a confirmé → mettre à jour cache et UI
     sauvegarderCache();
     closeM('m-membre');membreEnEdition=null;renderMembres();
-    // Puis sauvegarder en arrière-plan
-    sbUpdate('membres', idAMettreAJour, data).catch(e=>{
-      console.error('[saveMembre] Erreur update arrière-plan:', e);
-    });
-  } else {
-    // Nouveau membre : on insère et on attend la réponse pour avoir l'ID Supabase
-    data.id='m'+Date.now();
-    data.photo=photoVal;
-    // Ajouter en mémoire tout de suite
-    DB.membres.push({...data});
-    sauvegarderCache();
-    closeM('m-membre');membreEnEdition=null;renderMembres();
-    // Puis envoyer à Supabase en arrière-plan
-    sbInsert('membres', data).catch(e=>{
-      console.error('[saveMembre] Erreur insert arrière-plan:', e);
-    });
+  } catch(e) {
+    alert('⚠️ Erreur réseau lors de l\'enregistrement. Vérifie ta connexion et réessaie.');
+    console.error('[saveMembre]', e);
+    if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
   }
-  if(btnSave){btnSave.disabled=false;btnSave.textContent='Enregistrer';}
 }
 
 function ouvrirSortieMembre(id){
