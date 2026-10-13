@@ -643,7 +643,7 @@ tr:hover td{background:var(--vert-pale)}
     <div class="page" id="page-comptes">
       <div class="sbr">
         <div style="flex:1"></div>
-        <button class="btn btn-p" onclick="openM('m-compte')">+ Créer un compte</button>
+        <button class="btn btn-p" onclick="openCompteModal()">+ Créer un compte</button>
       </div>
       <div class="card">
         <div class="ch"><div class="ct">Comptes utilisateurs</div></div>
@@ -1072,6 +1072,24 @@ tr:hover td{background:var(--vert-pale)}
 <div class="mo" id="m-compte"><div class="mb">
   <div class="mh"><div class="mt">Créer un compte utilisateur</div><button class="mc" onclick="closeM('m-compte')">×</button></div>
   <div class="mbody"><div class="fg2">
+
+    <!-- Toggle depuis membre -->
+    <div class="fgg full" style="margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--gris-txt)">
+        <input type="checkbox" id="mc-depuis-membre" onchange="toggleDepuisMembre()" style="width:16px;height:16px;accent-color:var(--vert)">
+        Créer depuis un membre existant
+      </label>
+    </div>
+
+    <!-- Sélecteur membre (affiché si toggle coché) -->
+    <div id="bloc-depuis-membre" style="display:none" class="fgg full">
+      <label>Choisir un membre *</label>
+      <select id="mc-membre-sel" onchange="prefillDepuisMembre()">
+        <option value="">— Sélectionner un membre —</option>
+      </select>
+      <div style="font-size:11px;color:var(--gris-txt);margin-top:4px">Seuls les membres sans compte existant sont affichés.</div>
+    </div>
+
     <div class="fgg"><label>Prénom *</label><input id="mc-p" placeholder="Prénom"></div>
     <div class="fgg"><label>Nom *</label><input id="mc-n" placeholder="Nom"></div>
     <div class="fgg full"><label>Email *</label><input id="mc-e" type="email" placeholder="email@exemple.com"></div>
@@ -1101,7 +1119,7 @@ tr:hover td{background:var(--vert-pale)}
       <div class="alert" style="background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-pale2)">Le Vice-Président a accès à tous les volets en lecture et écriture.</div>
     </div>
   </div></div>
-  <div class="mf"><button class="btn btn-o" onclick="closeM('m-compte')">Annuler</button><button class="btn btn-p" onclick="creerCompte()">Créer le compte</button></div>
+  <div class="mf"><button class="btn btn-o" onclick="closeM('m-compte')">Annuler</button><button class="btn btn-p" id="btn-creer-compte" onclick="creerCompte()">Créer le compte</button></div>
 </div></div>
 
 
@@ -2187,6 +2205,40 @@ function renderComptes(){
     </tr>`).join('');
 }
 
+function toggleDepuisMembre(){
+  const checked=document.getElementById('mc-depuis-membre').checked;
+  const bloc=document.getElementById('bloc-depuis-membre');
+  bloc.style.display=checked?'block':'none';
+  if(checked){
+    // Peupler la liste : membres sans compte existant
+    const emailsAvecCompte=new Set(DB.users.map(u=>u.email.toLowerCase()));
+    const membresSansCompte=DB.membres.filter(m=>{
+      if(!m.email) return true; // pas d'email → pas de compte
+      return !emailsAvecCompte.has(m.email.toLowerCase());
+    });
+    const sel=document.getElementById('mc-membre-sel');
+    sel.innerHTML='<option value="">— Sélectionner un membre —</option>'+
+      membresSansCompte.map(m=>`<option value="${m.id}">${m.prenom} ${m.nom}${m.email?' — '+m.email:''}</option>`).join('');
+    // Réinitialiser les champs
+    document.getElementById('mc-p').value='';
+    document.getElementById('mc-n').value='';
+    document.getElementById('mc-e').value='';
+  } else {
+    // Vider la sélection
+    document.getElementById('mc-membre-sel').value='';
+  }
+}
+
+function prefillDepuisMembre(){
+  const id=document.getElementById('mc-membre-sel').value;
+  if(!id) return;
+  const m=DB.membres.find(x=>x.id==id);
+  if(!m) return;
+  document.getElementById('mc-p').value=m.prenom||'';
+  document.getElementById('mc-n').value=m.nom||'';
+  document.getElementById('mc-e').value=m.email||'';
+}
+
 async function creerCompte(){
   const p=v('mc-p'),n=v('mc-n'),e=v('mc-e'),pw=v('mc-pw');
   if(!p||!e||!pw){alert('Champs obligatoires manquants.');return;}
@@ -2194,10 +2246,19 @@ async function creerCompte(){
   if(DB.users.find(u=>u.email.toLowerCase()===e.toLowerCase())){alert('Cet email existe déjà.');return;}
   const r=v('mc-r');
   const acces_volets=r==='responsable'?getVoletAccesFromModal():null;
+  const btn=document.getElementById('btn-creer-compte');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Création...';}
   const data={id:'u'+Date.now(),prenom:p,nom:n,email:e,pwd:pw,role:r,volet:r==='responsable'?v('mc-v'):'tous',actif:true,acces_volets};
-  await sbInsert('users', data);
+  const ok=await sbInsert('users', data);
+  if(ok===null){if(btn){btn.disabled=false;btn.textContent='Créer le compte';}return;}
   DB.users.push(data);
-  closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);renderComptes();
+  sauvegarderCache();
+  // Reset toggle
+  const chk=document.getElementById('mc-depuis-membre');
+  if(chk){chk.checked=false;document.getElementById('bloc-depuis-membre').style.display='none';}
+  closeM('m-compte');clear(['mc-p','mc-n','mc-e','mc-pw']);
+  if(btn){btn.disabled=false;btn.textContent='Créer le compte';}
+  renderComptes();
   // Génère et affiche la carte d'accès automatiquement
   setTimeout(()=>genererCarte(data.id),200);
 }
@@ -2578,6 +2639,9 @@ function exportPartenaires(){
 // ══════════════════════════════
 function ouvrirEditCompte(uid){
   const u=DB.users.find(x=>x.id===uid);if(!u)return;
+  // Masquer le toggle "depuis membre" en mode édition
+  const chk=document.getElementById('mc-depuis-membre');
+  if(chk){chk.checked=false;chk.closest('.fgg').style.display='none';document.getElementById('bloc-depuis-membre').style.display='none';}
   document.getElementById('mc-p').value=u.prenom||'';
   document.getElementById('mc-n').value=u.nom||'';
   document.getElementById('mc-e').value=u.email||'';
@@ -3367,6 +3431,21 @@ function getVoletAccesFromModal(){
 }
 
 function openCompteModal(){
+  // Réinitialiser le toggle "depuis membre" et s'assurer qu'il est visible
+  const chk=document.getElementById('mc-depuis-membre');
+  if(chk){
+    chk.checked=false;
+    chk.closest('.fgg').style.display='';
+    document.getElementById('bloc-depuis-membre').style.display='none';
+  }
+  // Réinitialiser le titre et le bouton
+  const titre=document.querySelector('#m-compte .mt');
+  if(titre)titre.textContent='Créer un compte utilisateur';
+  const btn=document.getElementById('btn-creer-compte');
+  if(btn){btn.textContent='Créer le compte';btn.onclick=creerCompte;btn.disabled=false;}
+  // Vider les champs
+  clear(['mc-p','mc-n','mc-e','mc-pw']);
+  document.getElementById('mc-r').value='responsable';
   initVoletAccessBody();
   toggleVoletConfig();
   openM('m-compte');
